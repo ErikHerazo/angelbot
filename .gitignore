@@ -11,7 +11,7 @@ ENV/
 
 # Archivos de configuración sensibles
 .env
-.env.*
+!.env.example
 
 # Archivos de logs
 *.log
