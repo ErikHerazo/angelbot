@@ -1,0 +1,68 @@
+# Bytecode de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+
+# Archivos de configuración sensibles
+.env
+.env.*
+
+# Archivos de logs
+*.log
+
+# Configuración de IDEs
+.vscode/
+.idea/
+
+# Distribuciones
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Archivos temporales
+*.tmp
+*.swp
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# pytest
+.pytest_cache/
+
+# coverage
+htmlcov/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+
+# Archivos de docker alternos
+docker-compose.override.yml
+docker-compose.dev.yml
+Dockerfile.dev
+
+# Índices FAISS, modelos AI
+*.index
+*.faiss
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.bin
+
+# Otros posibles archivos binarios temporales
+*.sqlite3
+*.pid
+*.db
+
+# Archivos de checkpoints de notebooks
+.ipynb_checkpoints/
