@@ -19,7 +19,7 @@ completion = client.chat.completions.create(
     messages=[
         {
             "role": "user",
-            "content": "Quienes son los medicos de la clinica?",
+            "content": "Quienes son lo smedicos de la clinica?",
         },
     ],
     max_tokens=1024,
