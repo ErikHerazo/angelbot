@@ -1,6 +1,6 @@
 # from typing import Union
 from fastapi import FastAPI
-from app.api.routes import chat_router
+from app.api.routes import chat_router, upload_router
 
 
 app = FastAPI(
@@ -17,6 +17,7 @@ app = FastAPI(
 )
 
 app.include_router(chat_router, prefix="/api", tags=["chat"])
+app.include_router(upload_router, prefix="/api", tags=["upload"])
 
 @app.get("/")
 def read_root():
