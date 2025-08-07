@@ -1,0 +1,10 @@
+version: 3
+
+agent:
+  authtoken: 30xukUcfHGZgBiMZc3YBUCU53Yu_6p8WXpDqXE6B2gLijB7Md
+  api_key: 30y5qiZX5FrRU7PzMvrDRcmzPTu_AaJoh2GQ84Ue62mBnPQ2
+
+tunnels:
+  basic:
+    proto: http
+    addr: app:8000

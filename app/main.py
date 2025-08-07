@@ -1,6 +1,6 @@
 # from typing import Union
 from fastapi import FastAPI
-from app.api.routes import chat_router, upload_router
+from app.api.routes import chat_router, upload_router, chat_zoho_router
 
 
 app = FastAPI(
@@ -16,8 +16,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-app.include_router(chat_router, prefix="/api", tags=["chat"])
-app.include_router(upload_router, prefix="/api", tags=["upload"])
+app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
+app.include_router(chat_zoho_router, prefix="/api/chat", tags=["chat_zoho"])
+app.include_router(upload_router, prefix="/api/upload", tags=["upload"])
 
 @app.get("/")
 def read_root():
