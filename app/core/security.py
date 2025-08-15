@@ -22,6 +22,3 @@ def validate_upload_api_key_openai(x_api_key: str = Header(...)):
             detail="API Key inválida"
         )
     
-# def validate_zoho_api_key(x_zoho_api_key: str = Header(None)):
-#     if x_zoho_api_key != ZOHO_WEBHOOK_API_KEY:
-#         raise HTTPException(status_code=403, detail="Invalid Zoho Webhook API Key")
