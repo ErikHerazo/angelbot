@@ -24,7 +24,16 @@ async def zoho_bot_webhook(request: Request):
 
     print("============ pregunta: ", user_question)
     if not user_question:
-        raise HTTPException(status_code=400, detail="No question provided.")
+        welcome_payload = {
+            "action": "reply",
+            "replies": [
+                {
+                    "text": "👋 Hola, soy el asistente virtual de la Clínica Antiaging Group Barcelona. Estoy aquí para ayudarte con tus dudas y guiarte en nuestros tratamientos."
+                }
+            ]
+        }
+        print("➡️ Respuesta de bienvenida enviada a Zoho:\n", json.dumps(welcome_payload, indent=2))
+        return welcome_payload
 
     try:
         # Usa Azure o LangChain dependiendo de lo que quieras
