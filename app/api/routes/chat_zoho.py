@@ -15,7 +15,7 @@ async def webhook_head():
 async def zoho_bot_webhook(request: Request):
     body = await request.json()
 
-    # 🔍 Imprimir en consola el JSON completo recibido
+    # 🔍 Print the complete JSON received to the console
     print("📩 Webhook recibido de Zoho:\n", json.dumps(body))
 
     user_question = body.get("message", {}).get("text") or \
