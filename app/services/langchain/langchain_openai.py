@@ -37,13 +37,17 @@ async def query_langchain_with_search(user_question: str) -> str:
                             "type": "api_key",
                             "key": os.environ["AZURE_AI_SEARCH_API_KEY"],
                         },
-                        "query_type": "semantic",
+                        "query_type": "vector_semantic_hybrid",
                         "semantic_configuration": "default",
                         "top_n_documents": 5,
                         "in_scope": True,
                         "fields_mapping": {
                             "content_fields": ["content"],
                             "title_field": "title"
+                        },
+                        "embedding_dependency": {
+                            "type": "deployment_name",
+                            "deployment_name": os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"]
                         }
                     }
                 }
