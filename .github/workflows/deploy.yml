@@ -1,0 +1,19 @@
+name: Azure Login
+run-name: ${{ github.actor }} triggered a login test 🚀
+on: [push]
+
+jobs:
+  login-azure: # internal job name
+    name: Login to Azure  # visible in UI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pre-login message
+        run: echo "🔑 Starting Azure login..."
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Post-login message
+        run: echo "✅ Successfully logged in to Azure."
