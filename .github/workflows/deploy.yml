@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  login-azure: # internal job name
-    name: Login to Azure  # visible in UI
+  login-azure:
+    name: Login to Azure
     runs-on: ubuntu-latest
     steps:
       - name: Pre-login message
@@ -27,4 +27,3 @@ jobs:
   
       - name: Post-login message
         run: echo "✅ Successfully logged in to Azure and listed resource groups."
-        
