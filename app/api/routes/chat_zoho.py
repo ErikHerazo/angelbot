@@ -2,14 +2,19 @@ import json
 from fastapi import HTTPException
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from fastapi import Response
 from app.services.langchain.langchain_openai import query_langchain_with_search
 
 
 router = APIRouter()
 
-@router.head("/webhook")
+@router.head("/webhook", include_in_schema=False)
 async def webhook_head():
-    return JSONResponse(content={}, status_code=200)
+    return Response(status_code=200)
+
+@router.get("/webhook", include_in_schema=False)
+async def webhook_get():
+    return Response(status_code=200)
 
 @router.post("/webhook")
 async def zoho_bot_webhook(request: Request):
@@ -36,7 +41,7 @@ async def zoho_bot_webhook(request: Request):
             ]
         }
         print("➡️ Respuesta de bienvenida enviada a Zoho:\n", json.dumps(welcome_payload, indent=2))
-        return JSONResponse(content=welcome_payload, status_code=200)
+        return welcome_payload
 
     try:
         # Usa Azure o LangChain dependiendo de lo que quieras
