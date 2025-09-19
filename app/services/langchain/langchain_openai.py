@@ -3,7 +3,6 @@ import dotenv
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langdetect import detect
 from app.core import constants
 
 
@@ -11,15 +10,15 @@ dotenv.load_dotenv()
 
 async def query_langchain_with_search(user_question: str) -> str:
     deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME")
-
-    # Detectar idioma y mapear a nombre completo
-    detected_lang = detect(user_question)
-    user_lang = constants.LANG_MAP.get(detected_lang, "the same language as the question")
+    if not deployment:
+        raise ValueError("Falta AZURE_OPENAI_DEPLOYMENT_NAME en variables de entorno")
     
     prompt = ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template(constants.ASSISTANT_PROMPT),
         HumanMessagePromptTemplate.from_template("{input}")
     ])
+
+    formatted_prompt = prompt.format_messages(input=user_question)
 
     llm = AzureChatOpenAI(
         azure_deployment=deployment,
@@ -57,11 +56,8 @@ async def query_langchain_with_search(user_question: str) -> str:
         max_retries=constants.OPENAI_MAX_RETRIES,
     )
 
-    chain = prompt | llm | StrOutputParser()
-
-    response = await chain.ainvoke({
-        "input": user_question,
-        "language": user_lang
-    })
-
-    return response
+    # ✅ Forma correcta de llamar al LLM asíncrono
+    response = await llm.agenerate([formatted_prompt])
+    text = response.generations[0][0].text
+    parsed_response = StrOutputParser().parse(text)
+    return parsed_response
