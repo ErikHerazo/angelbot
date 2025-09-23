@@ -34,9 +34,6 @@ async def zoho_bot_webhook(request: Request):
             "replies": [
                 {
                     "text": "👋 Hola.. soy Aesthea, el asistente virtual de Antiaging Group Barcelona, tu clínica de medicina y cirugía estética. Nuestro objetivo es que te sientas mejor."
-                },
-                {
-                    "text": "Antes de iniciar.., ¿podrías darme tu nombre completo y tu dirección de email?"
                 }
             ]
         }
