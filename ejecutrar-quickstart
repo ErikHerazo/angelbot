@@ -1,2 +1,0 @@
-python3 app/services/cloud/azure/quickstart.py
-python3 app/services/langchain/quickstart.py
