@@ -10,3 +10,5 @@ langsmith==0.4.11
 Jinja2==3.1.6
 langdetect==1.0.9
 pyodbc==5.2.0
+holidays==0.81
+langchain==0.3.27
