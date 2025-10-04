@@ -9,7 +9,6 @@ def get_current_time_spain() -> datetime:
     madrid_tz = ZoneInfo("Europe/Madrid")
     return datetime.now(madrid_tz)
 
-
 @tool
 async def is_customer_service_available(input: str = "") -> bool:
     """
