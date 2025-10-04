@@ -1,8 +1,11 @@
+import logging
 import holidays
 from zoneinfo import ZoneInfo
 from datetime import datetime, time
 from langchain_core.tools import tool
 
+
+logger = logging.getLogger(__name__)
 
 # Obtener hora actual de España
 def get_current_time_spain() -> datetime:
@@ -20,24 +23,36 @@ async def is_customer_service_available(input: str = "") -> bool:
       - Sábado: 08:00-12:00
       - Domingos y festivos: no disponible
     """
+    logger.info("🛠️ Herramienta 'is_customer_service_available' invocada.")
+
     now = get_current_time_spain()
     dia_semana = now.weekday()  # Lunes=0, Domingo=6
+
+    # 1. Inicializar la variable de resultado
+    disponible = "False"
 
     # Lista de festivos en España
     es_holidays = holidays.Spain(years=now.year)
 
     # Si es domingo o festivo
     if dia_semana == 6 or now.date() in es_holidays:
-        return False
+        # Se mantiene en False
+        pass
 
-    # Horario de lunes a viernes
-    if 0 <= dia_semana <= 4:
+    # Horario de lunes a viernes (0-4)
+    elif 0 <= dia_semana <= 4:
         if time(8,0) <= now.time() <= time(12,0) or time(14,0) <= now.time() <= time(18,0):
-            return True
+            # 2. Asignar el valor a la variable
+            disponible = "True"
 
-    # Horario sábado
-    if dia_semana == 5:
+    # Horario sábado (5)
+    elif dia_semana == 5:
         if time(8,0) <= now.time() <= time(12,0):
-            return True
-
-    return False
+            # 2. Asignar el valor a la variable
+            disponible = "True"
+            
+    # 3. Registrar el resultado
+    logger.info(f"✅ Resultado: {disponible} (Hora en Madrid: {now.strftime('%Y-%m-%d %H:%M:%S')}, Día: {dia_semana})")
+    
+    # 4. Retornar la variable
+    return disponible

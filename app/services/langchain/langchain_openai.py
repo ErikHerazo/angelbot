@@ -1,20 +1,24 @@
 import os
 import dotenv
+import logging
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.runnables import RunnablePassthrough
-from langchain.prompts import MessagesPlaceholder # Se mantiene la importación corregida
-
-# Importaciones existentes
+from langchain.prompts import MessagesPlaceholder
 from app.services.langchain.tools import is_customer_service_available 
 from app.core import constants 
 
 
 dotenv.load_dotenv()
 
-# Configuración básica del logger
+# =================================================================
+# 💡 CORRECCIÓN 1: Configurar el logger de LangChain a DEBUG
+# Esto es esencial para ver la comunicación interna del LLM y el Agente.
+# =================================================================
 logging.basicConfig(level=logging.INFO)
+# Establecer el nivel DEBUG para las librerías de LangChain
+logging.getLogger("langchain").setLevel(logging.DEBUG) 
+logging.getLogger("langchain_core").setLevel(logging.DEBUG) 
 logger = logging.getLogger(__name__)
 
 # 🛠️ Lista de herramientas para el LLM
@@ -27,11 +31,10 @@ async def query_langchain_with_search(user_question: str) -> str:
     if not deployment:
         raise ValueError("Falta AZURE_OPENAI_DEPLOYMENT_NAME en variables de entorno")
     
-    # 2. Inicialización de los LLM (¡CORRECCIÓN CLAVE!)
+    # 2. Inicialización de los LLM (Se mantiene la separación)
     
     # --- LLM para RAG (llm_rag): CON extra_body para Azure Search ---
-    # Este LLM tiene las capacidades de RAG.
-    llm_rag = AzureChatOpenAI(
+    llm_agent = AzureChatOpenAI(
         azure_deployment=deployment,
         api_version=constants.AZURE_OPENAI_API_VERSION,
         temperature=constants.OPENAI_TEMPERATURE,
@@ -68,16 +71,14 @@ async def query_langchain_with_search(user_question: str) -> str:
     )
 
     # --- LLM para el Agente (llm_agent): SIN extra_body ---
-    # Este LLM se usa para el razonamiento y Tool Calling, evitando el error 400.
-    llm_agent = AzureChatOpenAI(
-        azure_deployment=deployment,
-        api_version=constants.AZURE_OPENAI_API_VERSION,
-        temperature=constants.OPENAI_TEMPERATURE,
-        max_tokens=constants.OPENAI_MAX_TOKENS,
-        # NO se incluye extra_body aquí
-        timeout=constants.OPENAI_TIMEOUT,
-        max_retries=constants.OPENAI_MAX_RETRIES,
-    )
+    # llm_agent = AzureChatOpenAI(
+    #     azure_deployment=deployment,
+    #     api_version=constants.AZURE_OPENAI_API_VERSION,
+    #     temperature=constants.OPENAI_TEMPERATURE,
+    #     max_tokens=constants.OPENAI_MAX_TOKENS,
+    #     timeout=constants.OPENAI_TIMEOUT,
+    #     max_retries=constants.OPENAI_MAX_RETRIES,
+    # )
     
     # 3. Configuración del Prompt (Se mantiene con MessagesPlaceholder)
     prompt = ChatPromptTemplate.from_messages([
@@ -87,17 +88,14 @@ async def query_langchain_with_search(user_question: str) -> str:
     ])
 
     # 4. CREACIÓN DEL AGENTE Y EL EXECUTOR
-    # Usamos el LLM limpio (llm_agent) para el razonamiento.
     agent = create_tool_calling_agent(llm_agent, TOOLS, prompt)
     
-    # 5. EL PROBLEMA DE RAG Y AGENTE
-    # Opción A (Recomendada para Tool Calling): Usar el Agente.
-    # El LLM para RAG (llm_rag) queda sin usar para evitar el conflicto.
-    # Esto funcionará 100% para la llamada a la herramienta, pero las respuestas RAG serán menos precisas.
+    # 5. Configuración del Executor
     agent_executor = AgentExecutor(
         agent=agent, 
         tools=TOOLS, 
-        verbose=False
+        # 💡 CORRECCIÓN 2: Volver a poner verbose=True para ver la traza de la cadena
+        verbose=True 
     )
     
     # 6. Invocación Asíncrona
