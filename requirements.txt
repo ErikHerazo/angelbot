@@ -10,10 +10,4 @@ langchain-openai==0.3.28
 Jinja2==3.1.6
 langdetect==1.0.9
 pyodbc==5.2.0
-<<<<<<< Updated upstream
-=======
-langgraph==0.6.8
-langchain-anthropic==0.3.21
-langchain==0.3.27
-langsmith==0.4.32
->>>>>>> Stashed changes
+holidays==0.82
