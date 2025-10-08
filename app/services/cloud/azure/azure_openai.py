@@ -8,14 +8,14 @@ from app.core import constants
 
 dotenv.load_dotenv()
 
-base_url = os.environ.get("AZURE_OPENAI_ENDPOINT_COGNITIVE_SERVICES")
+base_url = os.environ.get("AZURE_OPENAI_ENDPOINT")
 api_key = os.environ.get("AZURE_OPENAI_API_KEY")
 deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME")
 
 client = openai.AzureOpenAI(
-    base_url=base_url,
+    azure_endpoint=base_url,
     api_key=api_key,
-    api_version="2025-01-01-preview"
+    api_version="2024-11-20"
 )
 
 # ======================== Functions ==================================
