@@ -41,3 +41,31 @@ async def is_customer_service_available(input: str = "") -> bool:
             return True
 
     return False
+
+
+tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "is_customer_service_available",
+                "description": "Comprueba si el servicio de atención al cliente está disponible actualmente en España. "
+                                "Utilízala cuando el usuario pregunte si puede ser atendido por un asesor, "
+                                "si hay soporte disponible, o si el horario de atención está activo. "
+                                "Devuelve True si el servicio está disponible en este momento, de lo contrario False.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "input": {
+                            "type": "string",
+                            "description": (
+                                "Texto opcional proporcionado por el usuario. "
+                                "Puede incluir su consulta o contexto, aunque no es necesario "
+                                "para determinar la disponibilidad del servicio."
+                            ),
+                        },
+                    },
+                    "required": [],
+                },
+            }
+        },
+    ]
