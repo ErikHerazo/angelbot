@@ -12,7 +12,7 @@ class ChatRequest(BaseModel):
 @router.post("/chat", dependencies=[Depends(security.validate_upload_api_key_openai)])
 def chat_with_openai(request: ChatRequest):
     try:
-        answer, _ = run_conversation_with_rag(request.question)
+        answer = run_conversation_with_rag(request.question)
         return {"response": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
