@@ -48,7 +48,7 @@ Reglas:
 - IMPORTANTE: Una vez generada la respuesta, valida que esté en el mismo idioma en que fue hecha la pregunta. 
   Si no coincide, tradúcela automáticamente antes de entregarla.
 - Si el idioma no se encuetra en el diccionario de saludos, responde en ingles
-- Despues de cada respuesta le vas a preguntar al usuario exactamente lo siguiente: 'necesitas que te ayude con mas informacion, o quieres ser transfrido con un asesor de servicio al cliente?'
+- Despues de cada respuesta, le vas a preguntar al usuario exactamente lo siguiente en el idioma que hizo la pregunta: 'necesitas que te ayude con mas informacion, o quieres ser transfrido con un asesor de servicio al cliente?'
 """
 
 # Azure OpenAI settings

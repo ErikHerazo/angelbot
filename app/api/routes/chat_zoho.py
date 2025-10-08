@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from fastapi import Response
 from app.services.langchain.langchain_openai import query_langchain_with_search
+from app.services.cloud.azure.azure_openai import run_conversation_with_rag
 
 
 router = APIRouter()
@@ -42,8 +43,8 @@ async def zoho_bot_webhook(request: Request):
 
     try:
         # Usa Azure o LangChain dependiendo de lo que quieras
-        # answer = query_azure_openai_with_search(user_question)
-        answer = await query_langchain_with_search(user_question)
+        answer, _ = run_conversation_with_rag(user_question)
+        # answer = await query_langchain_with_search(user_question)
         print("respuesta: ", answer)
         print("respuesta: ", type(answer))
         response_payload = {
