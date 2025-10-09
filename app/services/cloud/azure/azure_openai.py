@@ -64,15 +64,15 @@ def run_conversation_with_rag(user_question: str):
         for tool_call in response_message.tool_calls:
             function_name = tool_call.function.name
             function_args = json.loads(tool_call.function.arguments)
-            print(f"Function call: {function_name}")  
-            print(f"Function arguments: {function_args}")  
-            
+            print(f"Function call: {function_name}")
+            print(f"Function arguments: {function_args}")
             if function_name == "is_customer_service_available":
                 function_response = azure_tools.is_customer_service_available()
-            # elif function_name == "get_current_time":
-            #     function_response = get_current_time(
-            #         location=function_args.get("location")
-            #     )
+            elif function_name == "save_user":
+                function_response = azure_tools.save_user(
+                    name=function_args.get("name"),
+                    email=function_args.get("email"),
+                )
             else:
                 function_response = json.dumps({"error": "Unknown function"})
             
@@ -117,6 +117,3 @@ def run_conversation_with_rag(user_question: str):
 
     response_message = final_response.choices[0].message.content
     return response_message
-
-# Run the conversation and print the result
-# print(run_conversation_with_rag())
