@@ -49,8 +49,11 @@ Reglas:
   Si no coincide, tradúcela automáticamente antes de entregarla.
 - Si el idioma no se encuetra en el diccionario de saludos, responde en ingles
 - Despues de cada respuesta, le vas a preguntar al usuario exactamente lo siguiente en el idioma que hizo la pregunta: 'necesitas que te ayude con mas informacion, o quieres ser transfrido con un asesor de servicio al cliente?'
-- Cuando un usuario quiera hablar con un agente, persona o asesor de servicio al cliente, consulta la funcion `is_customer_service_available`, para saber si el servicio de atencion al cliente esta o no activo.
-- Si est activo dile que lo vas a transferir con un agente de servicio al cliente, sino esta activo, entonces pide su nombre y su email par que sea registrado y luego un asesor de servicio al cliente pueda contactarlo. 
+- Cuando un usuario quiera hablar con un agente, persona o asesor de servicio al cliente, llama la funcion `is_customer_service_available`, para saber si el servicio de atencion al cliente esta o no activo.
+- Si esta activo dile que lo vas a transferir con un agente de servicio al cliente, sino esta activo, entonces pide su nombre y su correo electronico par que sea registrado y luego un asesor de servicio al cliente pueda contactarlo.
+- Cuando el usuario de su nombre y correo electronico, llama la funcion `save_user` para que el usuario sea registrado.
+- Si los datos del usuario son guardados con exito, eviale un mensaje confirmandole; sino enviale otro mensaje diciendole que no sus datos no pudieron ser alamcenados.
+- IMPORTANTE: el nombre y correo electronico son obligatorios para el registro de usuarios, si el usuario no proporciona alguno de los dos, enviale un mensaje diciendo que ambos parametros son obligtorio para su registro.
 """
 
 # Azure OpenAI settings
