@@ -5,7 +5,7 @@ from app.services.cloud.azure.client import get_azure_openai_client
 from app.services.cloud.azure import azure_tools
 
 
-def run_conversation_with_rag(user_question: str):
+async def run_conversation_with_rag(user_question: str):
     # 1️⃣ Mensajes que se envían al modelo
     messages = [
         {"role": "system", "content": constants.ASSISTANT_PROMPT},
@@ -14,12 +14,12 @@ def run_conversation_with_rag(user_question: str):
 
     # 2️⃣ Llamada al modelo con RAG
     client = get_azure_openai_client()
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),  # deployment del modelo
         messages=messages,
         tools=azure_tools.tools,
         tool_choice="auto",
-        temperature=0,       # sin creatividad, respuestas directas
+        temperature=0.5,      # sin creatividad, respuestas directas
         max_tokens=500,      # límite de tokens
         extra_body={         # parámetros RAG
             "data_sources": [
@@ -83,7 +83,7 @@ def run_conversation_with_rag(user_question: str):
     else:
         print("No tool calls were made by the model.")  
 
-    final_response = client.chat.completions.create(
+    final_response = await client.chat.completions.create(
         model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),  # deployment del modelo
         messages=messages,
         temperature=0,       # sin creatividad, respuestas directas
