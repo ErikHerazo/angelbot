@@ -1,8 +1,8 @@
 import os
-from openai import AzureOpenAI
+from openai import AsyncAzureOpenAI
 
 
-def get_azure_openai_client() -> AzureOpenAI:
+def get_azure_openai_client() -> AsyncAzureOpenAI:
     """
     Crea y devuelve un cliente de Azure OpenAI configurado con las credenciales
     y el endpoint especificados en las variables de entorno.
@@ -12,7 +12,7 @@ def get_azure_openai_client() -> AzureOpenAI:
         - AZURE_OPENAI_API_KEY: Clave de API para autenticar el cliente.
 
     Returns:
-        AzureOpenAI: Instancia del cliente listo para realizar llamadas a la API.
+        AsyncAzureOpenAI: Instancia del cliente listo para realizar llamadas a la API.
     """
     # Obtenemos la URL del endpoint de Azure OpenAI desde las variables de entorno
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -21,7 +21,7 @@ def get_azure_openai_client() -> AzureOpenAI:
     api_key = os.getenv("AZURE_OPENAI_API_KEY")
 
     # Creamos la instancia del cliente Azure OpenAI con la versión de API deseada
-    client = AzureOpenAI(
+    client = AsyncAzureOpenAI(
         azure_endpoint=endpoint,
         api_key=api_key,
         api_version="2025-01-01-preview"  # Versión de la API que se está utilizando

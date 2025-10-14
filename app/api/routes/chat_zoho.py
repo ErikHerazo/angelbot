@@ -43,7 +43,7 @@ async def zoho_bot_webhook(request: Request):
 
     try:
         # Usa Azure o LangChain dependiendo de lo que quieras
-        answer = run_conversation_with_rag(user_question)
+        answer = await run_conversation_with_rag(user_question)
         # answer = await query_langchain_with_search(user_question)
         print("respuesta: ", answer)
         print("respuesta: ", type(answer))
