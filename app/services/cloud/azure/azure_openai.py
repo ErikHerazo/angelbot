@@ -12,6 +12,8 @@ async def run_conversation_with_rag(user_question: str):
         {"role": "user", "content": user_question}
     ]
 
+    max_toks = 300 if len(user_question) > 200 else 150
+
     # 2️⃣ Llamada al modelo con RAG
     client = get_azure_openai_client()
     response = await client.chat.completions.create(
@@ -19,8 +21,8 @@ async def run_conversation_with_rag(user_question: str):
         messages=messages,
         tools=azure_tools.tools,
         tool_choice="auto",
-        temperature=0.5,      # sin creatividad, respuestas directas
-        max_tokens=500,      # límite de tokens
+        temperature=0,      # sin creatividad, respuestas directas
+        max_tokens=max_toks,      # límite de tokens
         extra_body={         # parámetros RAG
             "data_sources": [
                 {
