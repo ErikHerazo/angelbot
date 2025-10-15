@@ -1,4 +1,4 @@
-# from typing import Union
+import logging
 from fastapi import FastAPI
 from app.api.routes import chat_router, upload_router, chat_zoho_router
 
@@ -15,6 +15,12 @@ app = FastAPI(
     """,
     version="1.0.0"
 )
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("angelbot")
 
 app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_zoho_router, prefix="/api/chat", tags=["chat_zoho"])
