@@ -9,7 +9,6 @@ from app.services.cloud.azure import azure_tools
 from app.services.cloud.azure.client import get_azure_openai_client
 from app.core.logging_config import logger
 
-
 MAX_RETRIES = 5
 BASE_DELAY = 1.0
 
@@ -99,37 +98,55 @@ async def run_conversation_with_rag(user_question: str):
 
     # 🌀 Primera llamada con retry
     response = await call_with_retry(make_completion, messages, max_toks)
+
+    logger.info(f"📌 RESPONSE RAW: {response}")
+    print("📌 RESPONSE RAW:", response)
+
+    # ✅ Validación segura de choices y message
+    if not response.choices or response.choices[0] is None:
+        raise Exception(f"❌ Respuesta inválida de Azure OpenAI: {response}")
+
     response_message = response.choices[0].message
+    if response_message is None:
+        raise Exception(f"❌ response.choices[0].message es None: {response.choices[0]}")
+
     messages.append(
         {"role": response_message.role, "content": response_message.content or ""}
     )
+    logger.info(f"🧠 Respuesta inicial: {response_message.content[:200] if response_message.content else '[None]'}...")
 
-    logger.info(f"🧠 Respuesta inicial: {response_message.content[:200]}...")
-
-    # 🔧 Manejo de tools (si las hay)
-    if response_message.tool_calls:
+    # 🔧 Manejo seguro de tool calls
+    if hasattr(response_message, "tool_calls") and response_message.tool_calls:
         for tool_call in response_message.tool_calls:
             function_name = tool_call.function.name
-            function_args = json.loads(tool_call.function.arguments)
-            logger.info(f"🔧 Tool call: {function_name} | Args: {function_args}")
+            arguments_str = tool_call.function.arguments or "{}"
+            function_args = json.loads(arguments_str)
+            logger.info(f"🔧 Tool call detectada: {function_name} | Args: {function_args}")
 
             if function_name == "is_customer_service_available":
-                function_response = azure_tools.is_customer_service_available()
+                function_response = azure_tools.is_customer_service_available() or {"error": "tool returned None"}
             elif function_name == "save_user":
                 function_response = azure_tools.save_user(
                     name=function_args.get("name"),
                     email=function_args.get("email"),
-                )
+                ) or {"error": "tool returned None"}
             else:
-                function_response = json.dumps({"error": "Unknown function"})
+                function_response = {"error": "Unknown function"}
 
+            logger.info(f"✅ Resultado tool '{function_name}': {function_response}")
             messages.append({"role": "tool", "content": str(function_response)})
     else:
         logger.info("ℹ️ No hubo tool calls en la primera respuesta.")
 
     # 🧠 Segunda llamada (respuesta final)
     final_response = await call_with_retry(make_completion, messages, 500)
-    final_content = final_response.choices[0].message.content
+
+    logger.info(f"📌 RESPONSE RAW (final): {final_response}")
+    print("📌 RESPONSE RAW (final):", final_response)
+
+    # ✅ Validación segura de final_response
+    final_message = final_response.choices[0].message if final_response.choices and final_response.choices[0] else None
+    final_content = final_message.content if final_message and final_message.content else "[⚠️ No se generó respuesta de texto]"
 
     logger.info(f"✅ Respuesta final: {final_content[:250]}...")
 
