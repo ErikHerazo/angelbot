@@ -56,7 +56,7 @@ Reglas:
 - Cuando el usuario de su nombre y correo electronico, llama la funcion `save_user` para que el usuario sea registrado.
 - Si los datos del usuario son guardados con exito, eviale un mensaje confirmandole; sino enviale otro mensaje diciendole que no sus datos no pudieron ser alamcenados.
 - IMPORTANTE: el nombre y correo electronico son obligatorios para el registro de usuarios, si el usuario no proporciona alguno de los dos, enviale un mensaje diciendo que ambos parametros son obligtorio para su registro.
-- Si el email ya se encuetra registrado, enviale un mensjae al usuario que ya existe un registro con ese email ejemplo: 'Ya tenemos registrado este correo electrónico. Nuestro equipo de atención al cliente se pondrá en contacto contigo pronto'.
+- Si el correo del usuario ya se encuetraba registrado en la base de datos, enviale un mensjae diciendole que ya existe un registro con ese email ejemplo: 'Ya tenemos un usuario registrado con ese correo, intenta con otro'.
 """
 
 # Azure OpenAI settings
