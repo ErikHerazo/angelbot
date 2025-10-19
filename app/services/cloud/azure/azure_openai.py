@@ -9,14 +9,12 @@ from app.services.cloud.azure import azure_tools
 from app.services.cloud.azure.client import get_azure_openai_client
 from app.core.logging_config import logger
 
-MAX_RETRIES = 5
-BASE_DELAY = 1.0
 
 async def call_with_retry(func, *args, **kwargs):
     """
     Wrapper con retry/backoff + jitter para manejar errores 429 o 503.
     """
-    for attempt in range(1, MAX_RETRIES + 1):
+    for attempt in range(1, constants.OPENAI_MAX_RETRIES + 1):
         try:
             return await func(*args, **kwargs)
 
@@ -28,15 +26,8 @@ async def call_with_retry(func, *args, **kwargs):
                 retry_after = e.response.headers.get("retry-after")
 
             if status in [429, 503]:
-                if retry_after:
-                    delay = float(retry_after)
-                else:
-                    delay = BASE_DELAY * (2 ** (attempt - 1)) + random.uniform(0, 0.5)
-
-                logger.warning(
-                    f"⚠️ Rate limit ({status}) detectado. Reintento {attempt}/{MAX_RETRIES} "
-                    f"en {delay:.2f}s..."
-                )
+                delay = float(retry_after) if retry_after else (1.0 * (2 ** (attempt - 1)) + random.uniform(0, 0.5))
+                logger.warning(f"⚠️ Rate limit ({status}) detectado. Reintento {attempt}/{constants.OPENAI_MAX_RETRIES} en {delay:.2f}s...")
                 await asyncio.sleep(delay)
             else:
                 logger.error(f"❌ Error HTTP inesperado ({status}): {e}")
@@ -44,28 +35,37 @@ async def call_with_retry(func, *args, **kwargs):
 
         except Exception as e:
             logger.exception(f"💥 Excepción inesperada en intento {attempt}: {e}")
-            await asyncio.sleep(BASE_DELAY * (2 ** (attempt - 1)))
+            await asyncio.sleep(1.0 * (2 ** (attempt - 1)))
 
     raise Exception("🚫 Excedido el número máximo de reintentos con Azure OpenAI.")
 
 
 async def run_conversation_with_rag(user_question: str):
+    """
+    Ejecuta una conversación con Azure OpenAI usando RAG + llamadas a funciones paralelas.
+    Compatible con el patrón de function calling documentado por Azure.
+    """
+    deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+    client = get_azure_openai_client()
+
     messages = [
         {"role": "system", "content": constants.ASSISTANT_PROMPT},
         {"role": "user", "content": user_question},
     ]
 
-    max_toks = 300 if len(user_question) > 200 else 150
-    deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
-    client = get_azure_openai_client()
+    max_toks = constants.OPENAI_MAX_TOKENS if len(user_question) > 200 else int(constants.OPENAI_MAX_TOKENS / 3)
 
-    async def make_completion(messages, max_toks):
+    async def make_completion(messages, max_toks, force_text=False):
+        """
+        Realiza una llamada a Azure OpenAI ChatCompletion.
+        Si `force_text=True`, se fuerza tool_choice='none' para evitar más tool calls.
+        """
         return await client.chat.completions.create(
-            model=deployment,
+            model=deployment_name,
             messages=messages,
             tools=azure_tools.tools,
-            tool_choice="auto",
-            temperature=0,
+            tool_choice="none" if force_text else "auto",
+            temperature=constants.OPENAI_TEMPERATURE,
             max_tokens=max_toks,
             extra_body={
                 "data_sources": [
@@ -86,9 +86,7 @@ async def run_conversation_with_rag(user_question: str):
                             },
                             "embedding_dependency": {
                                 "type": "deployment_name",
-                                "deployment_name": os.environ[
-                                    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
-                                ],
+                                "deployment_name": os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
                             },
                         },
                     }
@@ -98,56 +96,65 @@ async def run_conversation_with_rag(user_question: str):
 
     # 🌀 Primera llamada con retry
     response = await call_with_retry(make_completion, messages, max_toks)
-
-    logger.info(f"📌 RESPONSE RAW: {response}")
-    print("📌 RESPONSE RAW:", response)
-
-    # ✅ Validación segura de choices y message
-    if not response.choices or response.choices[0] is None:
-        raise Exception(f"❌ Respuesta inválida de Azure OpenAI: {response}")
-
     response_message = response.choices[0].message
-    if response_message is None:
-        raise Exception(f"❌ response.choices[0].message es None: {response.choices[0]}")
+    logger.info(f"📌 RESPONSE RAW: {response_message}")
 
-    messages.append(
-        {"role": response_message.role, "content": response_message.content or ""}
-    )
-    logger.info(f"🧠 Respuesta inicial: {response_message.content[:200] if response_message.content else '[None]'}...")
+    messages.append({
+        "role": response_message.role,
+        "content": response_message.content or "",
+    })
 
-    # 🔧 Manejo seguro de tool calls
-    if hasattr(response_message, "tool_calls") and response_message.tool_calls:
+    logger.info("🧠 Respuesta inicial recibida.")
+
+    # 🚀 Manejo de llamadas paralelas (parallel tool calls)
+    if response_message.tool_calls:
         for tool_call in response_message.tool_calls:
             function_name = tool_call.function.name
-            arguments_str = tool_call.function.arguments or "{}"
-            function_args = json.loads(arguments_str)
-            logger.info(f"🔧 Tool call detectada: {function_name} | Args: {function_args}")
+            try:
+                function_args = json.loads(tool_call.function.arguments)
+            except Exception:
+                logger.warning(f"⚠️ Argumentos inválidos para {function_name}: {tool_call.function.arguments}")
+                continue
 
-            if function_name == "is_customer_service_available":
-                function_response = azure_tools.is_customer_service_available() or {"error": "tool returned None"}
-            elif function_name == "save_user":
-                function_response = azure_tools.save_user(
-                    name=function_args.get("name"),
-                    email=function_args.get("email"),
-                ) or {"error": "tool returned None"}
-            else:
-                function_response = {"error": "Unknown function"}
+            logger.info(f"🧩 Tool Call: {function_name} | Args: {function_args}")
 
-            logger.info(f"✅ Resultado tool '{function_name}': {function_response}")
-            messages.append({"role": "tool", "content": str(function_response)})
+            # Ejecutar función correspondiente
+            try:
+                if function_name == "is_customer_service_available":
+                    function_response = azure_tools.is_customer_service_available(
+                        input=function_args.get("input")
+                    )
+                elif function_name == "save_user":
+                    function_response = azure_tools.save_user(
+                        name=function_args.get("name"),
+                        email=function_args.get("email"),
+                    )
+                else:
+                    function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
+
+            except Exception as e:
+                logger.exception(f"💥 Error ejecutando función {function_name}: {e}")
+                function_response = json.dumps({"error": str(e)})
+
+            # Registrar respuesta del tool
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": function_response
+            })
+
     else:
-        logger.info("ℹ️ No hubo tool calls en la primera respuesta.")
+        logger.info("ℹ️ No se detectaron tool calls en la respuesta inicial.")
 
-    # 🧠 Segunda llamada (respuesta final)
-    final_response = await call_with_retry(make_completion, messages, 500)
+    # 🚦 Evitar loops de tool calls: fuerza respuesta textual
+    final_response = await call_with_retry(make_completion, messages, max_toks, force_text=True)
+    final_message = final_response.choices[0].message
 
-    logger.info(f"📌 RESPONSE RAW (final): {final_response}")
-    print("📌 RESPONSE RAW (final):", final_response)
+    # ✅ Validar respuesta final
+    if not final_message.content:
+        logger.warning("⚠️ El modelo devolvió content=None. Detalles:")
+        logger.warning(final_message)
+        return "⚠️ No se pudo generar una respuesta válida en este momento. Intenta nuevamente."
 
-    # ✅ Validación segura de final_response
-    final_message = final_response.choices[0].message if final_response.choices and final_response.choices[0] else None
-    final_content = final_message.content if final_message and final_message.content else "[⚠️ No se generó respuesta de texto]"
-
-    logger.info(f"✅ Respuesta final: {final_content[:250]}...")
-
-    return final_content
+    logger.info(f"💬 Respuesta final: {final_message.content}")
+    return final_message.content

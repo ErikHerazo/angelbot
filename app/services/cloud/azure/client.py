@@ -1,6 +1,6 @@
 import os
+from app.core import constants
 from openai import AsyncAzureOpenAI
-
 
 def get_azure_openai_client() -> AsyncAzureOpenAI:
     """
@@ -24,7 +24,7 @@ def get_azure_openai_client() -> AsyncAzureOpenAI:
     client = AsyncAzureOpenAI(
         azure_endpoint=endpoint,
         api_key=api_key,
-        api_version="2025-01-01-preview"  # Versión de la API que se está utilizando
+        api_version=constants.AZURE_OPENAI_API_VERSION
     )
 
     return client
