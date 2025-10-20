@@ -2,6 +2,7 @@ import os
 import json
 import random
 import asyncio
+
 from azure.core.exceptions import HttpResponseError
 
 from app.core import constants
@@ -9,6 +10,9 @@ from app.services.cloud.azure import azure_tools
 from app.services.cloud.azure.client import get_azure_openai_client
 from app.core.logging_config import logger
 
+from app.core.session_memory import SessionMemoryRedis
+
+session_memory = SessionMemoryRedis()
 
 async def call_with_retry(func, *args, **kwargs):
     """
@@ -40,7 +44,7 @@ async def call_with_retry(func, *args, **kwargs):
     raise Exception("🚫 Excedido el número máximo de reintentos con Azure OpenAI.")
 
 
-async def run_conversation_with_rag(user_question: str):
+async def run_conversation_with_rag(session_id: str, user_question: str):
     """
     Ejecuta una conversación con Azure OpenAI usando RAG + llamadas a funciones paralelas.
     Compatible con el patrón de function calling documentado por Azure.
@@ -48,10 +52,18 @@ async def run_conversation_with_rag(user_question: str):
     deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
     client = get_azure_openai_client()
 
+    # Recuperar historial de conversación
+    history = session_memory.get_session(session_id)
+
     messages = [
         {"role": "system", "content": constants.ASSISTANT_PROMPT},
-        {"role": "user", "content": user_question},
     ]
+
+    # Añadir mensajes anteriores al contexto
+    messages.extend(history)
+
+    # Añadir la nueva pregunta del usuario
+    messages.append({"role": "user", "content": user_question})
 
     max_toks = constants.OPENAI_MAX_TOKENS if len(user_question) > 200 else int(constants.OPENAI_MAX_TOKENS / 3)
 

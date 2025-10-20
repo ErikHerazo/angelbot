@@ -1,4 +1,5 @@
 services:
+
   app:
     build:
       context: .
@@ -11,6 +12,18 @@ services:
       - "8000:8000"
     volumes:
       - ./app:/app/app
+
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+    profiles: ["local"]
+
 
   ngrok:
     image: ngrok/ngrok:latest
