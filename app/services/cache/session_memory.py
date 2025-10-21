@@ -1,8 +1,6 @@
 import os
 import json
-import ssl
 import redis.asyncio as aioredis
-
 
 class SessionMemoryRedis:
     def __init__(self):
@@ -10,10 +8,13 @@ class SessionMemoryRedis:
         app_env = os.getenv("APP_ENV", "local").lower()
 
         if app_env == "prod":
-            # Redis Enterprise con SSL
-            self.redis_url = os.getenv("REDIS_URL_PROD")
-            ssl_context = ssl.create_default_context()
-            self.redis_kwargs = {"decode_responses": True, "ssl_context": ssl_context}
+            # Redis Enterprise en Azure con SSL y contraseña separada
+            host = os.getenv("REDIS_HOST_PROD")
+            port = os.getenv("REDIS_PORT_PROD")
+            password = os.getenv("REDIS_PASSWORD_PROD")
+            # rediss://<password>@<host>:<port>
+            self.redis_url = f"rediss://:{password}@{host}:{port}"
+            self.redis_kwargs = {"decode_responses": True}
         else:
             # Redis local (docker)
             self.redis_url = os.getenv("REDIS_URL_LOCAL", "redis://redis_local:6379")
