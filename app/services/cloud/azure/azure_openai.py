@@ -54,6 +54,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
 
     # 🧠 Recuperar historial de conversación desde Redis
     history = await session_memory.get_session(session_id)
+    logger.info(f"📝 Historial recuperado desde Redis: {history}")
     if not history:
         history = []
 

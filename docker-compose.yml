@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   app:
     build:
@@ -10,14 +12,12 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./app:/app/app    
+      - ./app:/app/app
     depends_on:
-      - redis_local
+      - redis
     restart: unless-stopped
-    networks:
-      - angelbot_net
 
-  redis_local:
+  redis:
     image: redis:8.2.2
     container_name: redis_local
     ports:
@@ -25,11 +25,10 @@ services:
     volumes:
       - redis_data:/data
     restart: always
-    networks:
-      - angelbot_net
 
   ngrok:
     image: ngrok/ngrok:latest
+    container_name: ngrok
     restart: unless-stopped
     depends_on:
       - app
@@ -41,11 +40,7 @@ services:
     volumes:
       - ./ngrok.yml:/etc/ngrok.yml
     ports:
-      - 4041:4040
+      - "4041:4040"
 
 volumes:
   redis_data:
-
-networks:
-  angelbot_net:
-    driver: bridge
