@@ -9,6 +9,10 @@ from app.services.cloud.azure import azure_tools
 from app.services.cloud.azure.client import get_azure_openai_client
 from app.core.logging_config import logger
 
+from app.services.cache.session_memory import SessionMemoryRedis
+
+session_memory = SessionMemoryRedis()
+MAX_HISTORY = 6
 
 async def call_with_retry(func, *args, **kwargs):
     """
@@ -40,7 +44,7 @@ async def call_with_retry(func, *args, **kwargs):
     raise Exception("🚫 Excedido el número máximo de reintentos con Azure OpenAI.")
 
 
-async def run_conversation_with_rag(user_question: str):
+async def run_conversation_with_rag(session_id: str, user_question: str):
     """
     Ejecuta una conversación con Azure OpenAI usando RAG + llamadas a funciones paralelas.
     Compatible con el patrón de function calling documentado por Azure.
@@ -48,10 +52,16 @@ async def run_conversation_with_rag(user_question: str):
     deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
     client = get_azure_openai_client()
 
-    messages = [
-        {"role": "system", "content": constants.ASSISTANT_PROMPT},
-        {"role": "user", "content": user_question},
-    ]
+    # 🧠 Recuperar historial de conversación desde Redis
+    history = await session_memory.get_session(session_id)
+    logger.info(f"📝 Historial recuperado desde Redis: {history}")
+    if not history:
+        history = []
+
+    # Construir el contexto inicial
+    messages = [{"role": "system", "content": constants.ASSISTANT_PROMPT}]
+    messages.extend(history)
+    messages.append({"role": "user", "content": user_question})
 
     max_toks = constants.OPENAI_MAX_TOKENS if len(user_question) > 200 else int(constants.OPENAI_MAX_TOKENS / 3)
 
@@ -155,6 +165,19 @@ async def run_conversation_with_rag(user_question: str):
         logger.warning("⚠️ El modelo devolvió content=None. Detalles:")
         logger.warning(final_message)
         return "⚠️ No se pudo generar una respuesta válida en este momento. Intenta nuevamente."
+    
+    # 💾 Guardar conversación en Redis (solo últimos N mensajes)
+    history.extend([
+        {"role": "user", "content": user_question},
+        {"role": "assistant", "content": final_message.content}
+    ])
+
+    # mantener sólo los últimos N mensajes
+    if len(history) > MAX_HISTORY:
+        history = history[-MAX_HISTORY:]
+
+    await session_memory.connect()
+    await session_memory.save_session(session_id, history)
 
     logger.info(f"💬 Respuesta final: {final_message.content}")
     return final_message.content

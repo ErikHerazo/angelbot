@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   app:
     build:
@@ -11,9 +13,22 @@ services:
       - "8000:8000"
     volumes:
       - ./app:/app/app
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.2.2
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
 
   ngrok:
     image: ngrok/ngrok:latest
+    container_name: ngrok
     restart: unless-stopped
     depends_on:
       - app
@@ -25,5 +40,7 @@ services:
     volumes:
       - ./ngrok.yml:/etc/ngrok.yml
     ports:
-      - 4041:4040
-      
+      - "4041:4040"
+
+volumes:
+  redis_data:

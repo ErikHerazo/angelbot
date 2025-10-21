@@ -11,3 +11,5 @@ Jinja2==3.1.6
 langdetect==1.0.9
 pyodbc==5.2.0
 holidays==0.82
+azure-identity==1.20.0
+redis-entraid==1.0.0
