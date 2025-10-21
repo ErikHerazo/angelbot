@@ -1,3 +1,4 @@
+import uuid
 import json
 from fastapi import HTTPException
 from fastapi import APIRouter, Request
@@ -42,8 +43,9 @@ async def zoho_bot_webhook(request: Request):
         return welcome_payload
 
     try:
-        # Usa Azure o LangChain dependiendo de lo que quieras
-        answer = await run_conversation_with_rag(user_question)
+        session_id = body.get("visitorId") or str(uuid.uuid4())
+        print("===== Session id: ", session_id)
+        answer = await run_conversation_with_rag(session_id, user_question)
         # answer = await query_langchain_with_search(user_question)
         print("respuesta: ", answer)
         print("respuesta: ", type(answer))
@@ -59,3 +61,4 @@ async def zoho_bot_webhook(request: Request):
         return JSONResponse(content=response_payload, status_code=200)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
