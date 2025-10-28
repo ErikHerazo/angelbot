@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from fastapi import Response
-from app.services.langchain.langchain_openai import query_langchain_with_search
+# from app.services.langchain.langchain_openai import query_langchain_with_search
 from app.services.cloud.azure.azure_openai import run_conversation_with_rag
 
 
