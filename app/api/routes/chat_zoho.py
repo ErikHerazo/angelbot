@@ -23,7 +23,7 @@ async def zoho_bot_webhook(request: Request):
     body = await request.json()
 
     # 🔍 Print the complete JSON received to the console
-    print("📩 Webhook recibido de Zoho:\n", json.dumps(body))
+    # print("📩 Webhook recibido de Zoho:\n", json.dumps(body))
 
     user_question = body.get("message", {}).get("text") or \
                     body.get("question") or \
@@ -39,16 +39,16 @@ async def zoho_bot_webhook(request: Request):
                 }
             ]
         }
-        print("➡️ Respuesta de bienvenida enviada a Zoho:\n", json.dumps(welcome_payload, indent=2))
+        # print("➡️ Respuesta de bienvenida enviada a Zoho:\n", json.dumps(welcome_payload, indent=2))
         return welcome_payload
 
     try:
         session_id = body.get("visitorId") or str(uuid.uuid4())
-        print("===== Session id: ", session_id)
+        # print("===== Session id: ", session_id)
         answer = await run_conversation_with_rag(session_id, user_question)
         # answer = await query_langchain_with_search(user_question)
-        print("respuesta: ", answer)
-        print("respuesta: ", type(answer))
+        # print("respuesta: ", answer)
+        # print("respuesta: ", type(answer))
         response_payload = {
             "action":"reply",
             "replies": [
@@ -57,7 +57,7 @@ async def zoho_bot_webhook(request: Request):
                 }
             ]
         }
-        print("Respuesta enviada a Zoho:\n", json.dumps(response_payload, indent=2))
+        # print("Respuesta enviada a Zoho:\n", json.dumps(response_payload, indent=2))
         return JSONResponse(content=response_payload, status_code=200)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
