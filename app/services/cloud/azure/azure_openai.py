@@ -138,6 +138,10 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
                         name=function_args.get("name"),
                         email=function_args.get("email"),
                     )
+                elif function_name == "procedures_and_treatments_price_list":
+                    function_response = azure_tools.procedures_and_treatments_price_list(
+                        name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
+                    )
                 else:
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 

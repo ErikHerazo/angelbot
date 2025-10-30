@@ -1,19 +1,11 @@
-# import pandas as pd
+# app/services/cloud/azure/run_blob_test.py
 from app.services.cloud.azure.azure_blob import AzureBlobService
 
-# Crear instancia apuntando al contenedor correcto
-blob_service = AzureBlobService(container_name="structured-data")
+# Instanciamos el servicio de Blob
+blob_service = AzureBlobService()
 
-# Nombre exacto del blob (ruta dentro del contenedor)
-blob_name = "price_list/precios_clinica_normalizado_v3.csv"
+# Leemos el CSV definido en el .env
+df = blob_service.read_csv_from_blob()
 
-# Leer CSV directamente desde Azure Blob como DataFrame
-df = blob_service.load_csv_as_dataframe(blob_name)
-
-# Mostrar algunas filas
-print("✅ Primeras filas del CSV leído desde Azure Blob:")
+# Mostramos las primeras filas
 print(df.head())
-
-# Mostrar info general del dataframe
-print("\n📊 Info del DataFrame:")
-print(df.info())
