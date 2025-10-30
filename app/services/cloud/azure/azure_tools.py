@@ -1,3 +1,5 @@
+import os
+import csv
 import json
 import pyodbc
 import holidays
@@ -5,6 +7,8 @@ from zoneinfo import ZoneInfo
 from datetime import datetime, time
 from app.services.db import connection
 from app.core.logging_config import logger
+from typing import List, Dict
+from app.services.cloud.azure.azure_blob import AzureBlobService
 
 
 # Obtener hora actual de España
@@ -122,6 +126,40 @@ def save_user(name: str, email: str):
         return json.dumps({
             "message": f"No se pudo registrar al usuario '{name}' con correo '{email}'. Error: {error}"
         })
+
+async def price_list(nombre_cirugia: str) -> List[Dict]:
+    """
+    Busca coincidencias de procedimientos en el archivo de precios almacenado en Azure Blob Storage.
+    """
+    resultados = []
+    query = nombre_cirugia.strip().lower()
+
+    try:
+        # 1️⃣ Inicializamos el servicio de Blob
+        blob_service = AzureBlobService()
+
+        # 2️⃣ Leemos el CSV remoto (ya configurado en .env)
+        df = blob_service.read_csv_from_blob()
+
+        # 3️⃣ Recorremos las filas para buscar coincidencias
+        for _, fila in df.iterrows():
+            texto_busqueda = " ".join([
+                str(fila.get("procedure_name", "")),
+                str(fila.get("synonyms", "")),
+                str(fila.get("raw_text", ""))
+            ]).lower()
+
+            if query in texto_busqueda:
+                resultados.append(fila.to_dict())
+
+        if not resultados:
+            return [{"mensaje": f"No se encontró ninguna cirugía con el nombre '{nombre_cirugia}'."}]
+
+        return resultados
+
+    except Exception as e:
+        logger.error(f"❌ Error en price_list: {e}")
+        return [{"error": f"Ocurrió un error leyendo el CSV desde Azure Blob: {str(e)}"}]
 
 tools = [
     {

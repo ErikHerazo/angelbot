@@ -1,6 +1,6 @@
 import logging
 from fastapi import FastAPI
-from app.api.routes import chat_router, upload_router, chat_zoho_router
+from app.api.routes import chat_router, chat_zoho_router
 
 
 app = FastAPI(
@@ -24,7 +24,6 @@ logger = logging.getLogger("angelbot")
 
 app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_zoho_router, prefix="/api/chat", tags=["chat_zoho"])
-app.include_router(upload_router, prefix="/api/upload", tags=["upload"])
 
 @app.get("/")
 def read_root():
