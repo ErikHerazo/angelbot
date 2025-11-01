@@ -31,18 +31,17 @@ async def call_with_retry(func, *args, **kwargs):
 
             if status in [429, 503]:
                 delay = float(retry_after) if retry_after else (1.0 * (2 ** (attempt - 1)) + random.uniform(0, 0.5))
-                # logger.warning(f"⚠️ Rate limit ({status}) detectado. Reintento {attempt}/{constants.OPENAI_MAX_RETRIES} en {delay:.2f}s...")
+                logger.warning(f"⚠️ Rate limit ({status}) detectado. Reintento {attempt}/{constants.OPENAI_MAX_RETRIES} en {delay:.2f}s...")
                 await asyncio.sleep(delay)
             else:
-                # logger.error(f"❌ Error HTTP inesperado ({status}): {e}")
+                logger.error(f"❌ Error HTTP inesperado ({status}): {e}")
                 raise e
 
         except Exception as e:
-            # logger.exception(f"💥 Excepción inesperada en intento {attempt}: {e}")
+            logger.exception(f"💥 Excepción inesperada en intento {attempt}: {e}")
             await asyncio.sleep(1.0 * (2 ** (attempt - 1)))
 
     raise Exception("🚫 Excedido el número máximo de reintentos con Azure OpenAI.")
-
 
 async def run_conversation_with_rag(session_id: str, user_question: str):
     """
@@ -99,7 +98,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
                                 "deployment_name": os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
                             },
                         },
-                    }
+                    },
                 ]
             },
         )
@@ -107,7 +106,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
     # 🌀 Primera llamada con retry
     response = await call_with_retry(make_completion, messages, max_toks)
     response_message = response.choices[0].message
-    # logger.info(f"📌 RESPONSE RAW: {response_message}")
+    logger.info(f"📌 RESPONSE RAW: {response_message}")
 
     messages.append({
         "role": response_message.role,
@@ -123,10 +122,10 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
             try:
                 function_args = json.loads(tool_call.function.arguments)
             except Exception:
-                # logger.warning(f"⚠️ Argumentos inválidos para {function_name}: {tool_call.function.arguments}")
+                logger.warning(f"⚠️ Argumentos inválidos para {function_name}: {tool_call.function.arguments}")
                 continue
 
-            # logger.info(f"🧩 Tool Call: {function_name} | Args: {function_args}")
+            logger.info(f"🧩 Tool Call: {function_name} | Args: {function_args}")
 
             # Ejecutar función correspondiente
             try:
@@ -139,11 +138,15 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
                         name=function_args.get("name"),
                         email=function_args.get("email"),
                     )
+                elif function_name == "procedures_and_treatments_price_list":
+                    function_response = azure_tools.procedures_and_treatments_price_list(
+                        name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
+                    )
                 else:
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 
             except Exception as e:
-                # logger.exception(f"💥 Error ejecutando función {function_name}: {e}")
+                logger.exception(f"💥 Error ejecutando función {function_name}: {e}")
                 function_response = json.dumps({"error": str(e)})
 
             # Registrar respuesta del tool
@@ -154,7 +157,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
             })
 
     else:
-        # logger.info("ℹ️ No se detectaron tool calls en la respuesta inicial.")
+        logger.info("ℹ️ No se detectaron tool calls en la respuesta inicial.")
         pass
 
     # 🚦 Evitar loops de tool calls: fuerza respuesta textual
@@ -163,8 +166,8 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
 
     # ✅ Validar respuesta final
     if not final_message.content:
-        # logger.warning("⚠️ El modelo devolvió content=None. Detalles:")
-        # logger.warning(final_message)
+        logger.warning("⚠️ El modelo devolvió content=None. Detalles:")
+        logger.warning(final_message)
         return "⚠️ No se pudo generar una respuesta válida en este momento. Intenta nuevamente."
     
     # 💾 Guardar conversación en Redis (solo últimos N mensajes)
