@@ -14,35 +14,6 @@ from app.services.cache.session_memory import SessionMemoryRedis
 session_memory = SessionMemoryRedis()
 MAX_HISTORY = 6
 
-async def call_with_retry(func, *args, **kwargs):
-    """
-    Wrapper con retry/backoff + jitter para manejar errores 429 o 503.
-    """
-    for attempt in range(1, constants.OPENAI_MAX_RETRIES + 1):
-        try:
-            return await func(*args, **kwargs)
-
-        except HttpResponseError as e:
-            status = getattr(e.response, "status_code", None)
-            retry_after = None
-
-            if hasattr(e, "response") and hasattr(e.response, "headers"):
-                retry_after = e.response.headers.get("retry-after")
-
-            if status in [429, 503]:
-                delay = float(retry_after) if retry_after else (1.0 * (2 ** (attempt - 1)) + random.uniform(0, 0.5))
-                logger.warning(f"⚠️ Rate limit ({status}) detectado. Reintento {attempt}/{constants.OPENAI_MAX_RETRIES} en {delay:.2f}s...")
-                await asyncio.sleep(delay)
-            else:
-                logger.error(f"❌ Error HTTP inesperado ({status}): {e}")
-                raise e
-
-        except Exception as e:
-            logger.exception(f"💥 Excepción inesperada en intento {attempt}: {e}")
-            await asyncio.sleep(1.0 * (2 ** (attempt - 1)))
-
-    raise Exception("🚫 Excedido el número máximo de reintentos con Azure OpenAI.")
-
 async def run_conversation_with_rag(session_id: str, user_question: str):
     """
     Ejecuta una conversación con Azure OpenAI usando RAG + llamadas a funciones paralelas.
@@ -104,7 +75,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
         )
 
     # 🌀 Primera llamada con retry
-    response = await call_with_retry(make_completion, messages, max_toks)
+    response = await make_completion(messages, max_toks)
     response_message = response.choices[0].message
     logger.info(f"📌 RESPONSE RAW: {response_message}")
 
@@ -161,7 +132,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
         pass
 
     # 🚦 Evitar loops de tool calls: fuerza respuesta textual
-    final_response = await call_with_retry(make_completion, messages, max_toks, force_text=True)
+    final_response = await make_completion(messages, max_toks, force_text=True)
     final_message = final_response.choices[0].message
 
     # ✅ Validar respuesta final

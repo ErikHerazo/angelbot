@@ -2,6 +2,7 @@ import os
 from app.core import constants
 from openai import AsyncAzureOpenAI
 
+
 def get_azure_openai_client() -> AsyncAzureOpenAI:
     """
     Crea y devuelve un cliente de Azure OpenAI configurado con las credenciales
