@@ -9,9 +9,9 @@ from app.core import constants
 dotenv.load_dotenv()
 
 async def query_langchain_with_search(user_question: str) -> str:
-    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME")
+    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
     if not deployment:
-        raise ValueError("Falta AZURE_OPENAI_DEPLOYMENT_NAME en variables de entorno")
+        raise ValueError("Falta AZURE_OPENAI_DEPLOYMENT_NAME_MAIN en variables de entorno")
     
     prompt = ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template(constants.ASSISTANT_PROMPT),

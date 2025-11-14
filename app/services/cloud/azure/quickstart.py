@@ -4,9 +4,9 @@ import dotenv
 
 dotenv.load_dotenv()
 
-endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
-api_key = os.environ.get("AZURE_OPENAI_API_KEY")
-deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME")
+endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT_MAIN")
+api_key = os.environ.get("AZURE_OPENAI_API_KEY_MAIN")
+deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
 
 client = openai.AzureOpenAI(
     azure_endpoint=endpoint,

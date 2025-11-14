@@ -8,7 +8,7 @@ from langchain_core.output_parsers import StrOutputParser
 def main():
     dotenv.load_dotenv()
 
-    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME")
+    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
 
     llm = AzureChatOpenAI(
         azure_deployment=deployment,

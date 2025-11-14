@@ -48,7 +48,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
     Ejecuta una conversación con Azure OpenAI usando RAG + llamadas a funciones paralelas.
     Compatible con el patrón de function calling documentado por Azure.
     """
-    deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+    deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
     client = get_azure_openai_client()
 
     # 🧠 Recuperar historial de conversación desde Redis

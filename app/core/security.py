@@ -5,7 +5,7 @@ from fastapi import Header, HTTPException, status
 load_dotenv()
 
 API_KEY = os.getenv("UPLOAD_API_KEY")
-API_KEY_OPENAI = os.getenv("AZURE_OPENAI_API_KEY")
+API_KEY_OPENAI = os.getenv("AZURE_OPENAI_API_KEY_MAIN")
 ZOHO_WEBHOOK_API_KEY=os.getenv("ZOHO_WEBHOOK_API_KEY")
 
 def validate_upload_api_key(x_api_key: str = Header(...)):
