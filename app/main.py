@@ -1,7 +1,7 @@
 import logging
 from fastapi import FastAPI
 from app.api.routes import chat_router, chat_zoho_router
-
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(
     title="Angel Bot API",
@@ -15,6 +15,8 @@ app = FastAPI(
     """,
     version="1.0.0"
 )
+
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 logging.basicConfig(
     level=logging.INFO,

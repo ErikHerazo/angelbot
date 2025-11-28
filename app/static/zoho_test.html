@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Prueba Zoho Staging</title>
+</head>
+
+<body>
+
+    <h2>Prueba del Chatbot Zoho (Staging)</h2>
+
+    <script type="text/javascript">
+        var $zoho = $zoho || {};
+        $zoho.salesiq = $zoho.salesiq || {
+            widgetcode: "TU_WIDGET_CODE_AQUÍ",
+            values: {}, ready: function () { }
+        };
+        var d = document;
+        s = d.createElement("script");
+        s.type = "text/javascript";
+        s.id = "zsiqscript";
+        s.defer = true;
+        s.src = "https://salesiq.zoho.eu/widget";
+        t = d.getElementsByTagName("script")[0];
+        t.parentNode.insertBefore(s, t);
+    </script>
+
+    <script>window.$zoho = window.$zoho || {}; $zoho.salesiq = $zoho.salesiq || { ready: function () { } }</script>
+    <script id="zsiqscript"
+        src="https://salesiq.zohopublic.eu/widget?wc=siq5839878f02b87d35ed25acd38dc2400d296f979d13fed49d295b6375d4836a03"
+        defer></script>
+
+</body>
+
+</html>
