@@ -1,6 +1,6 @@
 import logging
 from fastapi import FastAPI
-from app.api.routes import chat_router, chat_zoho_router
+from app.api.routes import chat_zoho_router
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(
@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("angelbot")
 
-app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
+# app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_zoho_router, prefix="/api/chat", tags=["chat_zoho"])
 
 @app.get("/")

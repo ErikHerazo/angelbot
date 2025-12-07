@@ -98,3 +98,5 @@ OPENAI_TEMPERATURE = 1.0
 OPENAI_MAX_TOKENS = 4096
 OPENAI_TIMEOUT = None
 OPENAI_MAX_RETRIES = 5
+
+ZOHO_API_BASE = "https://salesiq.zoho.eu/api/v2/antiaginggroup/conversations"

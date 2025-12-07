@@ -2,21 +2,24 @@ import uuid
 import json
 from fastapi import HTTPException
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi import Response
 # from app.services.langchain.langchain_openai import query_langchain_with_search
 from app.services.cloud.azure.azure_openai import run_conversation_with_rag
-from fastapi.responses import HTMLResponse
+
 
 router = APIRouter()
 
-# **Endpoint frontend para pruebas del bot Zoho**
 @router.get("/zoho-test", include_in_schema=False)
 async def zoho_test_page():
     """Página de pruebas donde se carga el widget de Zoho (Staging)."""
     with open("app/static/zoho_test.html", "r", encoding="utf-8") as f:
         html_content = f.read()
     return HTMLResponse(content=html_content)
+
+@router.get("/authorization", include_in_schema=False)
+async def webhook_head():
+    return Response(status_code=200)
 
 @router.head("/webhook", include_in_schema=False)
 async def webhook_head():
@@ -29,15 +32,21 @@ async def webhook_get():
 @router.post("/webhook")
 async def zoho_bot_webhook(request: Request):
     body = await request.json()
+    print('========== body:', body)
+    
+    visitor = body.get("visitor", {})
+    message = body.get("message") or {}
 
-    # 🔍 Print the complete JSON received to the console
-    print("=== 📩 request ===\n", json.dumps(body))
+    conversation_id = visitor.get("active_conversation_id")
+    visitor_id = visitor.get("visitor_id")
+    app_id = body.get("request", {}).get("app_id")
+    user_question = message.get("text") or visitor.get("question")
 
-    user_question = body.get("message", {}).get("text") or \
-                    body.get("question") or \
-                    body.get("text")
+    print("=== Conversation ID:", conversation_id)
+    print("=== Visitor ID:", visitor_id)
+    print("=== app_id:", app_id)
+    print("=== Pregunta:", user_question)
 
-    # print("============ pregunta: ", user_question)
     if not user_question:
         welcome_payload = {
             "action": "reply",
