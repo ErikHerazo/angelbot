@@ -61,14 +61,14 @@ async def send_final_response(request_id: str, answer_text: str):
     url = f"https://{ZOHOSALESIQ_SERVER_URI}/api/v2/{SCREENNAME}/callbacks/{request_id}/response"
 
     payload = {
-        "action" : "reply",
-        "replies" : [
+        "action":"reply",
+        "replies": [
             {
-            "type": "text",
-            "text": answer_text,
+                "text": answer_text
             }
         ]
     }
+    
     headers = {
         "Authorization": f"Zoho-oauthtoken {ZOHO_ACCESS_TOKEN}",
         "Content-Type": "application/json"
@@ -76,9 +76,25 @@ async def send_final_response(request_id: str, answer_text: str):
     async with httpx.AsyncClient(timeout=30.0) as client:
         print(f"=== Enviando respuesta final a Zoho para request_id: {request_id}")
         resp = await client.post(url, json=payload, headers=headers)
-        if resp.status_code != 200:
-            print(f"ERROR al enviar mensaje ({resp.status_code}): {resp.text}")
-        resp.raise_for_status()
+        if resp.status_code not in (200, 204):
+            print("ERROR RESPONSE", resp.status_code, resp.text)
+            raise HTTPException(status_code=500, detail="Final response failed")
+
+async def process_message_async(request_id: str, session_id: str, user_question: str):
+    try:
+        # 1) Enviar progreso
+        await send_progress_update(request_id)
+
+        # 2) Generar respuesta LLM (tu RAG)
+        answer = await run_conversation_with_rag(session_id, user_question)
+
+        # 3) Enviar respuesta final
+        await send_final_response(request_id, answer)
+
+        print("✔️ Respuesta final enviada correctamente")
+
+    except Exception as e:
+        print("❌ ERROR en process_message_async:", e)
 
 # --- ENDPOINT PRINCIPAL ---
 @router.post("/webhook")
@@ -117,7 +133,8 @@ async def zoho_bot_webhook(request: Request):
                 "replies" : ["estoy procesando tu solicitud..."]
             }
 
-            # await send_progress_update(request_id)
+            # ✔️ Ejecutar tarea asincrónica después del return
+            asyncio.create_task(process_message_async(request_id, session_id, user_question))
             return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
