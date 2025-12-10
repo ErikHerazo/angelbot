@@ -9,16 +9,7 @@
 <body>
     <h1>Test AngelBot</h1>
 
-    <script>
-        window.$zoho = window.$zoho || {};
-        $zoho.salesiq = $zoho.salesiq || {
-            ready: function () {
-                // Configura el tiempo de espera infinito
-                ZohoSalesIQ.Chat.setWaitingTime(-1);
-            }
-        };
-    </script>
-
+    <script>window.$zoho = window.$zoho || {}; $zoho.salesiq = $zoho.salesiq || { ready: function () { } }</script>
     <script id="zsiqscript"
         src="https://salesiq.zohopublic.eu/widget?wc=siqf8269d575b767fa9232b4fd3e8b2411f52b6f803837dad4aec30464235b84fc5f458ed756dca30b7df2318631549968c"
         defer>
