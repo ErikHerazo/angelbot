@@ -117,6 +117,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
 
     # 🚀 Manejo de llamadas paralelas (parallel tool calls)
     if response_message.tool_calls:
+        # print("============= HAY LLAMADO DE FUNCIONES ============================")
         for tool_call in response_message.tool_calls:
             function_name = tool_call.function.name
             try:

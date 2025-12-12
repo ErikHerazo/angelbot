@@ -7,7 +7,7 @@ from app.services.cloud.azure.azure_openai import run_conversation_with_rag
 
 router = APIRouter()
 
-ZOHO_ACCESS_TOKEN = "1000.71691cecbb6712c6a66c3d0134b77435.0492069a0a983e05ef8691846d52fe2b"
+ZOHO_ACCESS_TOKEN = "1000.2f3f719a5063920c39560d963d68f186.bfe36756cd1cef45308314d727d51415"
 SCREENNAME = "antiaginggroup"
 ZOHOSALESIQ_SERVER_URI = "salesiq.zoho.eu"
 
