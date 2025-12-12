@@ -125,9 +125,11 @@ async def zoho_bot_webhook(request: Request):
         return welcome_payload
 
     try:
-        session_id = body.get("visitorId") or str(uuid.uuid4())
-        
+        session_id = body.get("visitor", {}).get("visitor_id")
+        if not session_id:
+            session_id = str(uuid.uuid4())
         if handler == "message":
+            print(f"========== SESSION_ID: {session_id}")
             payload = {
                 "action" : "pending",
                 "replies" : ["estoy procesando tu solicitud..."]
