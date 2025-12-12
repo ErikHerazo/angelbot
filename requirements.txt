@@ -14,3 +14,5 @@ holidays==0.82
 azure-identity==1.20.0
 redis-entraid==1.0.0
 pandas==2.3.3
+azure-keyvault-secrets==4.10.0
+azure-identity==1.20.0
