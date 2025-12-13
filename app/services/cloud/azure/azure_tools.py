@@ -105,6 +105,7 @@ def save_user(name: str, email: str):
                 if exists:
                     logger.info(f"⚠️ Usuario existente: {email}")
                     return json.dumps({
+                        "status": "already_exists",
                         "message": f"El correo '{email}' ya está registrado. Intente con otro o contacte soporte."
                     })
 
@@ -115,12 +116,14 @@ def save_user(name: str, email: str):
         logger.info(f"✅ Usuario registrado correctamente: {name} <{email}>")
 
         return json.dumps({
+            "status": "created",
             "message": f"Usuario '{name}' con correo '{email}' registrado correctamente."
         })
 
     except Exception as error:
         logger.error(f"❌ Error al registrar usuario [{email}]: {error}")
         return json.dumps({
+            "status": "error",
             "message": f"No se pudo registrar al usuario '{name}' con correo '{email}'. Error: {error}"
         })
 

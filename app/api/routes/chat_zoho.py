@@ -1,15 +1,24 @@
-import asyncio
+import os
 import uuid
 import httpx
+import asyncio
+
+from dotenv import load_dotenv
+
+from fastapi.responses import HTMLResponse, Response
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse, Response
+
+from app.core import security
+from app.core import constants
 from app.services.cloud.azure.azure_openai import run_conversation_with_rag
+
 
 router = APIRouter()
 
-ZOHO_ACCESS_TOKEN = "1000.2f3f719a5063920c39560d963d68f186.bfe36756cd1cef45308314d727d51415"
-SCREENNAME = "antiaginggroup"
-ZOHOSALESIQ_SERVER_URI = "salesiq.zoho.eu"
+load_dotenv()
+
+ZOHO_ACCESS_TOKEN = os.getenv("ZOHO_ACCESS_TOKEN")
+
 
 
 @router.get("/zoho-test", include_in_schema=False)
@@ -38,7 +47,7 @@ async def webhook_get():
 async def send_progress_update(request_id: str):
     """Envía un mensaje de 'progreso' para extender el tiempo de espera de Zoho."""
 
-    url = f"https://{ZOHOSALESIQ_SERVER_URI}/api/v2/{SCREENNAME}/callbacks/{request_id}/progress"
+    url = f"https://{constants.ZOHOSALESIQ_SERVER_URI}/api/v2/{constants.SCREENNAME}/callbacks/{request_id}/progress"
     
     payload = {
         "text": "Just a few more seconds.."
@@ -58,7 +67,7 @@ async def send_progress_update(request_id: str):
 
 async def send_final_response(request_id: str, answer_text: str):
     """Envia la respuesta final a Zoho para completar la acción pendiente."""
-    url = f"https://{ZOHOSALESIQ_SERVER_URI}/api/v2/{SCREENNAME}/callbacks/{request_id}/response"
+    url = f"https://{constants.ZOHOSALESIQ_SERVER_URI}/api/v2/{constants.SCREENNAME}/callbacks/{request_id}/response"
 
     payload = {
         "action":"reply",
@@ -99,6 +108,19 @@ async def process_message_async(request_id: str, session_id: str, user_question:
 # --- ENDPOINT PRINCIPAL ---
 @router.post("/webhook")
 async def zoho_bot_webhook(request: Request):
+    signature_b64 = request.headers.get("x-siqsignature")
+    print(f"========== SIGNATURE: {signature_b64}")
+
+    if not signature_b64:
+        raise HTTPException(400, detail="Falta header x-siqsignature")
+    
+    body_bytes = await request.body()
+    print(f"========== Zoho Full Payload: {body_bytes}")
+
+    # Verificar la firma
+    if not security.check_zoho_rsa_signature(signature_b64, body_bytes):
+        raise HTTPException(403, detail="Firma inválida")
+    print("================= VALIDACION DE FIRMA RSA EXITOSA ========================")    
     body = await request.json()
     
     handler = body.get("handler")
@@ -140,3 +162,4 @@ async def zoho_bot_webhook(request: Request):
             return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
