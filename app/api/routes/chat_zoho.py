@@ -1,7 +1,7 @@
 import os
 import uuid
-import httpx
 import asyncio
+import logging
 
 from dotenv import load_dotenv
 
@@ -9,118 +9,82 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi import APIRouter, Request, HTTPException
 
 from app.core import security
-from app.core import constants
 from app.services.cloud.azure.azure_openai import run_conversation_with_rag
+from app.services.zoho.client import ZohoClient
 
 
 router = APIRouter()
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 ZOHO_ACCESS_TOKEN = os.getenv("ZOHO_ACCESS_TOKEN")
 
-
+zoho_client = ZohoClient(access_token=ZOHO_ACCESS_TOKEN)
 
 @router.get("/zoho-test", include_in_schema=False)
 async def zoho_test_page():
     with open("app/static/zoho_test.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
-
 @router.get("/authorization", include_in_schema=False)
 async def webhook_head():
     return Response(status_code=200)
-
 
 @router.head("/webhook", include_in_schema=False)
 async def webhook_head2():
     return Response(status_code=200)
 
-
 @router.get("/webhook", include_in_schema=False)
 async def webhook_get():
     return Response(status_code=200)
 
-# ---------------------------------------------------------------------
-# ✔️ Nueva función para enviar la respuesta final vía API callback/response
-# ---------------------------------------------------------------------
-async def send_progress_update(request_id: str):
-    """Envía un mensaje de 'progreso' para extender el tiempo de espera de Zoho."""
-
-    url = f"https://{constants.ZOHOSALESIQ_SERVER_URI}/api/v2/{constants.SCREENNAME}/callbacks/{request_id}/progress"
-    
-    payload = {
-        "text": "Just a few more seconds.."
-    }
-    
-    headers = {
-        "Authorization": f"Zoho-oauthtoken {ZOHO_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        
-        if resp.status_code not in (200, 204):
-            print(f"ERROR PROGRESS", resp.status_code, resp.text)
-            raise HTTPException(status_code=500, detail="Progress Failed")
-
-async def send_final_response(request_id: str, answer_text: str):
-    """Envia la respuesta final a Zoho para completar la acción pendiente."""
-    url = f"https://{constants.ZOHOSALESIQ_SERVER_URI}/api/v2/{constants.SCREENNAME}/callbacks/{request_id}/response"
-
-    payload = {
-        "action":"reply",
-        "replies": [
-            {
-                "text": answer_text
-            }
-        ]
-    }
-    
-    headers = {
-        "Authorization": f"Zoho-oauthtoken {ZOHO_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        print(f"=== Enviando respuesta final a Zoho para request_id: {request_id}")
-        resp = await client.post(url, json=payload, headers=headers)
-        if resp.status_code not in (200, 204):
-            print("ERROR RESPONSE", resp.status_code, resp.text)
-            raise HTTPException(status_code=500, detail="Final response failed")
-
 async def process_message_async(request_id: str, session_id: str, user_question: str):
     try:
+        logger.info(
+            "Processing Zoho message",
+            extra={
+                "request_id": request_id,
+                "session_id": session_id,
+            },
+        )
         # 1) Enviar progreso
-        await send_progress_update(request_id)
+        await zoho_client.send_progress_update(request_id=request_id)
 
         # 2) Generar respuesta LLM (tu RAG)
         answer = await run_conversation_with_rag(session_id, user_question)
 
         # 3) Enviar respuesta final
-        await send_final_response(request_id, answer)
+        await zoho_client.send_final_response(request_id=request_id, answer_text=answer)
 
-        print("✔️ Respuesta final enviada correctamente")
-
+        logger.info(
+            "Zoho response completed",
+            extra={"request_id": request_id},
+        )
     except Exception as e:
-        print("❌ ERROR en process_message_async:", e)
+        logger.exception(
+            "Zoho async processing failed",
+            extra={"request_id": request_id},
+        )
 
 # --- ENDPOINT PRINCIPAL ---
 @router.post("/webhook")
 async def zoho_bot_webhook(request: Request):
     signature_b64 = request.headers.get("x-siqsignature")
+    body_bytes = await request.body()
+
     print(f"========== SIGNATURE: {signature_b64}")
+    print(f"========== Zoho Full Payload: {body_bytes}")
 
     if not signature_b64:
         raise HTTPException(400, detail="Falta header x-siqsignature")
-    
-    body_bytes = await request.body()
-    print(f"========== Zoho Full Payload: {body_bytes}")
 
     # Verificar la firma
     if not security.check_zoho_rsa_signature(signature_b64, body_bytes):
         raise HTTPException(403, detail="Firma inválida")
-    print("================= VALIDACION DE FIRMA RSA EXITOSA ========================")    
+    print("================= SUCCESSFUL RSA SIGNATURE VALIDATION ========================")
+    
     body = await request.json()
     
     handler = body.get("handler")
@@ -129,10 +93,13 @@ async def zoho_bot_webhook(request: Request):
     request_id = body.get("request", {}).get("id")
     user_question = message.get("text") or visitor.get("question")
 
-    print(f"========== BODY: {body}")
-    print(f"========== HANDLER: {handler}")
-    print(f"========== REQUEST_ID: {request_id}")
-    print(f"========== USER_QUESTION: {user_question}")
+    logger.info(
+        "Zoho webhook received",
+        extra={
+            "handler": handler,
+            "request_id": request_id,
+        },
+    )
     
     if handler == "trigger":
         welcome_payload = {
@@ -143,22 +110,33 @@ async def zoho_bot_webhook(request: Request):
                 }
             ]
         }
-        # print("➡️ Respuesta de bienvenida enviada a Zoho:\n", json.dumps(welcome_payload, indent=2))
         return welcome_payload
 
     try:
         session_id = body.get("visitor", {}).get("visitor_id")
         if not session_id:
             session_id = str(uuid.uuid4())
+
         if handler == "message":
-            print(f"========== SESSION_ID: {session_id}")
+            logger.info(
+                "Message webhook received",
+                extra={
+                    "handler": handler,
+                    "zoho_message": message,
+                },
+            )
             payload = {
                 "action" : "pending",
                 "replies" : ["estoy procesando tu solicitud..."]
             }
 
             # ✔️ Ejecutar tarea asincrónica después del return
-            asyncio.create_task(process_message_async(request_id, session_id, user_question))
+            asyncio.create_task(
+                process_message_async(
+                    request_id, session_id,
+                    user_question
+                )
+            )
             return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
