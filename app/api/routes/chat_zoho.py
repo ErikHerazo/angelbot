@@ -6,9 +6,9 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi import APIRouter, Request, HTTPException
 
 from app.core import security
-from app.services.chat.zoho_processor import process_message_async
 from app.core import security
-
+from app.services.chat.zoho_payload import parse_zoho_payload
+from app.services.chat.zoho_processor import process_message_async
 
 router = APIRouter()
 
@@ -36,24 +36,20 @@ async def webhook_get():
 async def zoho_bot_webhook(request: Request):
     # Validates RSA signature and caches the body
     await security.validate_zoho_webhook(request)
-    
+
     body = await request.json()
-    
-    handler = body.get("handler")
-    message = body.get("message") or {}
-    visitor = body.get("visitor", {})
-    request_id = body.get("request", {}).get("id")
-    user_question = message.get("text") or visitor.get("question")
+
+    zoho_message = parse_zoho_payload(body=body)
 
     logger.info(
         "Zoho webhook received",
         extra={
-            "handler": handler,
-            "request_id": request_id,
+            "handler": zoho_message.handler,
+            "request_id": zoho_message.request_id,
         },
     )
     
-    if handler == "trigger":
+    if zoho_message.handler == "trigger":
         welcome_payload = {
             "action": "reply",
             "replies": [
@@ -65,16 +61,14 @@ async def zoho_bot_webhook(request: Request):
         return welcome_payload
 
     try:
-        session_id = body.get("visitor", {}).get("visitor_id")
-        if not session_id:
-            session_id = str(uuid.uuid4())
+        session_id = zoho_message.session_id or str(uuid.uuid4())
 
-        if handler == "message":
+        if zoho_message.handler == "message":
             logger.info(
                 "Message webhook received",
                 extra={
-                    "handler": handler,
-                    "zoho_message": message,
+                    "handler": zoho_message.handler,
+                    "has_question": bool(zoho_message.user_question),
                 },
             )
             payload = {
@@ -82,11 +76,11 @@ async def zoho_bot_webhook(request: Request):
                 "replies" : ["estoy procesando tu solicitud..."]
             }
 
-            # ✔️ Ejecutar tarea asincrónica después del return
+            # ✔️ Execute asynchronous task after return
             asyncio.create_task(
                 process_message_async(
-                    request_id, session_id,
-                    user_question
+                    zoho_message.request_id, session_id,
+                    zoho_message.user_question
                 )
             )
             return payload
