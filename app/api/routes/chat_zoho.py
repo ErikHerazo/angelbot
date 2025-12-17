@@ -1,27 +1,18 @@
-import os
 import uuid
 import asyncio
 import logging
-
-from dotenv import load_dotenv
 
 from fastapi.responses import HTMLResponse, Response
 from fastapi import APIRouter, Request, HTTPException
 
 from app.core import security
-from app.services.cloud.azure.azure_openai import run_conversation_with_rag
-from app.services.zoho.client import ZohoClient
+from app.services.chat.zoho_processor import process_message_async
+from app.core import security
 
 
 router = APIRouter()
 
-load_dotenv()
-
 logger = logging.getLogger(__name__)
-
-ZOHO_ACCESS_TOKEN = os.getenv("ZOHO_ACCESS_TOKEN")
-
-zoho_client = ZohoClient(access_token=ZOHO_ACCESS_TOKEN)
 
 @router.get("/zoho-test", include_in_schema=False)
 async def zoho_test_page():
@@ -40,50 +31,11 @@ async def webhook_head2():
 async def webhook_get():
     return Response(status_code=200)
 
-async def process_message_async(request_id: str, session_id: str, user_question: str):
-    try:
-        logger.info(
-            "Processing Zoho message",
-            extra={
-                "request_id": request_id,
-                "session_id": session_id,
-            },
-        )
-        # 1) Enviar progreso
-        await zoho_client.send_progress_update(request_id=request_id)
-
-        # 2) Generar respuesta LLM (tu RAG)
-        answer = await run_conversation_with_rag(session_id, user_question)
-
-        # 3) Enviar respuesta final
-        await zoho_client.send_final_response(request_id=request_id, answer_text=answer)
-
-        logger.info(
-            "Zoho response completed",
-            extra={"request_id": request_id},
-        )
-    except Exception as e:
-        logger.exception(
-            "Zoho async processing failed",
-            extra={"request_id": request_id},
-        )
-
 # --- ENDPOINT PRINCIPAL ---
 @router.post("/webhook")
 async def zoho_bot_webhook(request: Request):
-    signature_b64 = request.headers.get("x-siqsignature")
-    body_bytes = await request.body()
-
-    print(f"========== SIGNATURE: {signature_b64}")
-    print(f"========== Zoho Full Payload: {body_bytes}")
-
-    if not signature_b64:
-        raise HTTPException(400, detail="Falta header x-siqsignature")
-
-    # Verificar la firma
-    if not security.check_zoho_rsa_signature(signature_b64, body_bytes):
-        raise HTTPException(403, detail="Firma inválida")
-    print("================= SUCCESSFUL RSA SIGNATURE VALIDATION ========================")
+    # Validates RSA signature and caches the body
+    await security.validate_zoho_webhook(request)
     
     body = await request.json()
     
