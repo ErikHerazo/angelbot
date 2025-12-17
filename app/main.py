@@ -22,7 +22,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger("angelbot")
 
 # app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_zoho_router, prefix="/api/chat", tags=["chat_zoho"])
