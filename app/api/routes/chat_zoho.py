@@ -6,7 +6,6 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi import APIRouter, Request, HTTPException
 
 from app.core import security
-from app.core import security
 from app.services.chat.zoho_payload import parse_zoho_payload
 from app.services.chat.zoho_processor import process_message_async
 
@@ -31,11 +30,12 @@ async def webhook_head2():
 async def webhook_get():
     return Response(status_code=200)
 
-# --- ENDPOINT PRINCIPAL ---
+# --- MAIN ENDPOINT ---
 @router.post("/webhook")
 async def zoho_bot_webhook(request: Request):
     # Validates RSA signature and caches the body
     await security.validate_zoho_webhook(request)
+    
     body = await request.json()
     zoho_message = parse_zoho_payload(body=body)
 
@@ -71,17 +71,22 @@ async def zoho_bot_webhook(request: Request):
             )
             payload = {
                 "action" : "pending",
-                "replies" : ["estoy procesando tu solicitud..."]
+                "replies" : ["I am processing your request..."]
             }
 
             # ✔️ Execute asynchronous task after return
             asyncio.create_task(
                 process_message_async(
-                    zoho_message.request_id, session_id,
-                    zoho_message.user_question
+                    request_id=zoho_message.request_id,
+                    session_id=session_id,
+                    user_question=zoho_message.user_question
                 )
             )
             return payload
     except Exception as e:
+        logger.exception(
+            "Zoho webhook failed",
+            extra={"request_id": zoho_message.request_id},
+        )
         raise HTTPException(status_code=500, detail=str(e))
     
