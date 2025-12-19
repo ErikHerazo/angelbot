@@ -103,4 +103,7 @@ ZOHO_API_BASE = "https://salesiq.zoho.eu/api/v2/antiaginggroup/conversations"
 SCREENNAME = "antiaginggroup"
 ZOHOSALESIQ_SERVER_URI = "salesiq.zoho.eu"
 
-MESSAGE_OF_PROGRESS="I am processing your request..."
+PENDING_PAYLOAD = {
+    "action": "pending",
+    "replies": ["I am processing your request..."]
+}

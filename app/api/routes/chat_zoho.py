@@ -1,5 +1,3 @@
-import uuid
-import asyncio
 import logging
 
 from fastapi.responses import HTMLResponse, Response
@@ -7,7 +5,8 @@ from fastapi import APIRouter, Request, HTTPException
 
 from app.core import security
 from app.services.chat.zoho_payload import parse_zoho_payload
-from app.services.chat.zoho_processor import process_message_async
+from app.services.chat.handlers.trigger_handler import handle_trigger
+from app.services.chat.handlers.message_handler import handle_message
 
 router = APIRouter()
 
@@ -46,43 +45,12 @@ async def zoho_bot_webhook(request: Request):
             "request_id": zoho_message.request_id,
         },
     )
-    
-    if zoho_message.handler == "trigger":
-        welcome_payload = {
-            "action": "reply",
-            "replies": [
-                {
-                    "text": "👋 Hola.. soy Aesthea, el asistente virtual de Antiaging Group Barcelona, tu clínica de medicina y cirugía estética. Nuestro objetivo es que te sientas mejor."
-                }
-            ]
-        }
-        return welcome_payload
-
     try:
-        session_id = zoho_message.session_id or str(uuid.uuid4())
-
+        if zoho_message.handler == "trigger":
+            return handle_trigger()
+        
         if zoho_message.handler == "message":
-            logger.info(
-                "Message webhook received",
-                extra={
-                    "handler": zoho_message.handler,
-                    "has_question": bool(zoho_message.user_question),
-                },
-            )
-            payload = {
-                "action" : "pending",
-                "replies" : ["I am processing your request..."]
-            }
-
-            # ✔️ Execute asynchronous task after return
-            asyncio.create_task(
-                process_message_async(
-                    request_id=zoho_message.request_id,
-                    session_id=session_id,
-                    user_question=zoho_message.user_question
-                )
-            )
-            return payload
+            return handle_message(zoho_message=zoho_message)
     except Exception as e:
         logger.exception(
             "Zoho webhook failed",

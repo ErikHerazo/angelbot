@@ -1,6 +1,10 @@
-from app.core import constants
+import logging
 
-def welcome_message():
+logger = logging.getLogger(__name__)
+
+def handle_trigger():
+    logger.info("Handling Zoho trigger event")
+
     return {
         "action": "reply",
         "replies": [
@@ -11,11 +15,5 @@ def welcome_message():
                     "y cirugía estética. Nuestro objetivo es que te sientas mejor."
                 )
             }
-        ],
-    }
-
-def pending_message(text=constants.MESSAGE_OF_PROGRESS):
-    return {
-        "action": "pending",
-        "replies": [text],
+        ]
     }
