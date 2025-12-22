@@ -76,9 +76,6 @@ def check_zoho_rsa_signature(signature: str, payload: bytes) -> bool:
         return False
 
 async def validate_zoho_webhook(request: Request) -> bytes:
-    """
-    Validates the RSA signature of the Zoho webhook and returns the body in bytes.
-    """
     signature_b64 = request.headers.get("x-siqsignature")
 
     if not signature_b64:
@@ -86,18 +83,23 @@ async def validate_zoho_webhook(request: Request) -> bytes:
             status_code=400,
             detail="Missing header x-siqsignature"
         )
-    
+
     body_bytes = await request.body()
-
-    # Save the body so that the handler can reuse it
-    request.state.body = body_bytes
-
+    logger.info("x-siqsignature present=%s", bool(signature_b64))
+    logger.info("x-siqsignature raw=%s", signature_b64)
     if not check_zoho_rsa_signature(signature_b64, body_bytes):
         raise HTTPException(
             status_code=403,
             detail="Invalid signature"
         )
+    
+    logger.info("✅ Zoho webhook RSA signature VALIDATED successfully")
+
+    # ✅ REINYECTAR el body para que request.json() funcione
+    async def receive():
+        return {"type": "http.request", "body": body_bytes}
+
+    request._receive = receive
 
     logger.info("Zoho webhook signature validated")
-
     return body_bytes
