@@ -1,13 +1,17 @@
+import os
 import re
 import json
+import httpx
 import holidays
 import unicodedata
+from typing import Optional
 from zoneinfo import ZoneInfo
+from app.core import constants
+from fastapi import HTTPException
 from datetime import datetime, time
 from app.services.db import connection
 from app.core.logging_config import logger
 from app.services.cloud.azure.azure_blob import AzureBlobService
-
 
 # Obtener hora actual de España
 def get_current_time_spain() -> datetime:
@@ -196,6 +200,55 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
             "error": f"Ocurrió un error leyendo el CSV desde Azure Blob: {str(e)}",
             "nota": "💡 Los precios del dataset son referenciales y pueden variar."
         })
+
+async def transfer_chat_to_operators(
+        department_id: str,
+        conversation_id: str,
+        operator_id: Optional[str]=None,
+        timeout: float = 10.0
+    ):
+    url = f'https://salesiq.zoho.com/api/v2/{constants.SCREENNAME}/conversations/{conversation_id}/transfer'
+    ZOHO_ACCESS_TOKEN = os.getenv("ZOHO_ACCESS_TOKEN")
+
+    Payload = {
+        "department_id" : "19000000000017",
+        "operator_id" : "19000000026003",
+        "note":"The previous deal was closed"
+    }
+
+    headers = {
+        "Authorization": f"Zoho-oauthtoken {ZOHO_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(url=url, json=Payload, headers=headers)
+    except httpx.RequestError as e:
+        logger.error(
+            "Zoho connection error",
+            extra={
+                "url": url,
+                "error": str(e)
+            }
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=f"Zoho connection error: {str(e)}"
+        )
+    
+    if resp.status_code not in (200, 204):
+        logger.error(
+            "Zoho API error",
+            extra={
+                "url": url,
+                "status": resp.status_code,
+            }
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Zoho API error {resp.status_code}: {resp.text}"
+        )
 
 tools = [
     {
