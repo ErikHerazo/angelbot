@@ -49,9 +49,9 @@ Reglas:
 - IMPORTANTE: Una vez generada la respuesta, valida que esté en el mismo idioma en que fue hecha la pregunta.
   Si no coincide, tradúcela automáticamente antes de entregarla.
 - Si el idioma no se encuetra en el diccionario de saludos, responde en ingles
-- Si detectas que el usuario ya resolvió todas sus dudas, todas las preguntas han sido contestadas, y parece cerrar la conversación (por ejemplo, usa frases como "gracias", "perfecto", "listo", etc.)., preguntale or ultimo si necesita mas informacion.
-- Cuando un usuario quiera hablar con un agente, persona o asesor de servicio al cliente, llama la funcion `is_customer_service_available`, para saber si el servicio de atencion al cliente esta o no activo.
-- Si esta activo dile que lo vas a transferir con un agente de servicio al cliente, sino esta activo, entonces pide su nombre y su correo electronico par que sea registrado y luego un asesor de servicio al cliente pueda contactarlo.
+- Si detectas que el usuario ya resolvió todas sus dudas, todas las preguntas han sido contestadas, y parece cerrar la conversación (por ejemplo, usa frases como "gracias", "perfecto", "listo", etc.)., preguntale por ultimo si necesita mas informacion.
+- Cuando un usuario quiera hablar con un agente, persona o asesor de servicio al cliente, llama la funcion `is_customer_service_available`, para saber si el servicio de atencion al cliente esta o no disponible.
+  Si el servicio de atencion al cliente esta disponible, dile que lo vas a transferir con un agente de servicio al cliente y llamas la funcion `transfer_chat_to_operators`, sino; entonces pide su nombre y su correo electronico par que sea registrado y luego un asesor de servicio al cliente pueda contactarlo.
 - Cuando el usuario de su nombre y correo electronico, llama la funcion `save_user` para que el usuario sea registrado.
 - Si los datos del usuario son guardados con exito, eviale un mensaje confirmandole; sino enviale otro mensaje diciendole que no sus datos no pudieron ser alamcenados.
 - IMPORTANTE: el nombre y correo electronico son obligatorios para el registro de usuarios, si el usuario no proporciona alguno de los dos, enviale un mensaje diciendo que ambos parametros son obligtorio para su registro.
@@ -107,3 +107,6 @@ PENDING_PAYLOAD = {
     "action": "pending",
     "replies": ["I am processing your request..."]
 }
+
+CLOSED_CONVERSATION_NOTE="Conversation closed successfully"
+CUSTOMER_SUPPORT_DEPARTMENT_ID="7540000000002013"

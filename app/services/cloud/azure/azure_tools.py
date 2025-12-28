@@ -7,54 +7,49 @@ import unicodedata
 from typing import Optional
 from zoneinfo import ZoneInfo
 from app.core import constants
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from datetime import datetime, time
 from app.services.db import connection
 from app.core.logging_config import logger
+from app.services.chat.zoho_payload import parse_zoho_payload
 from app.services.cloud.azure.azure_blob import AzureBlobService
+
 
 # Obtener hora actual de España
 def get_current_time_spain() -> datetime:
     madrid_tz = ZoneInfo("Europe/Madrid")
     return datetime.now(madrid_tz)
 
-def is_customer_service_available(input: str = ""):
-    now = get_current_time_spain()
-    dia_semana = now.weekday()  # Lunes=0, Domingo=6
-    es_holidays = holidays.Spain(years=now.year)
-
-    # Domingo o festivo
-    if dia_semana == 6 or now.date() in es_holidays:
-        return json.dumps({
-            "message": "El servicio de atención al cliente no está disponible hoy (domingo o festivo)."
-        })
-
-    # Horario laboral
-    message = "El servicio de atención al cliente no está disponible en este momento."
-
-    if 0 <= dia_semana <= 4:
-        if time(8, 0) <= now.time() <= time(12, 0) or time(14, 0) <= now.time() <= time(18, 0):
-            message = "El servicio de atención al cliente está disponible actualmente."
-    elif dia_semana == 5:
-        if time(8, 0) <= now.time() <= time(12, 0):
-            message = "El servicio de atención al cliente está disponible actualmente."
-
-    return json.dumps({"message": message})
-
-
 # def is_customer_service_available(input: str = ""):
-#     """
-#     Indica si el personal de servicio al cliente está disponible actualmente en la clinica.
-    
-#     Retorna un string JSON con:
-#       - available: True/False
-#       - message: texto explicativo que el modelo puede usar.
-#     """
-#     # return test available=True
-#     return json.dumps({
-#         "available": False,
-#         "message": "El servicio de atención al cliente no está disponible actualmente."
-#     })
+#     now = get_current_time_spain()
+#     dia_semana = now.weekday()  # Lunes=0, Domingo=6
+#     es_holidays = holidays.Spain(years=now.year)
+
+#     # Domingo o festivo
+#     if dia_semana == 6 or now.date() in es_holidays:
+#         return json.dumps({
+#             "message": "El servicio de atención al cliente no está disponible hoy (domingo o festivo)."
+#         })
+
+#     # Horario laboral
+#     message = "El servicio de atención al cliente no está disponible en este momento."
+
+#     if 0 <= dia_semana <= 4:
+#         if time(8, 0) <= now.time() <= time(12, 0) or time(14, 0) <= now.time() <= time(18, 0):
+#             message = "El servicio de atención al cliente está disponible actualmente."
+#     elif dia_semana == 5:
+#         if time(8, 0) <= now.time() <= time(12, 0):
+#             message = "El servicio de atención al cliente está disponible actualmente."
+
+#     return json.dumps({"message": message})
+
+def is_customer_service_available(input: str = "") -> str:
+    # funcion probar donde siempre estan disponibles el personal de atencion al cliente
+    return json.dumps({
+        "available": True,
+        "reason": "forced_available_for_testing",
+        "message": "Customer service is available. You may transfer the conversation to a human agent."
+    })
 
 def ensure_users_table():
     """
@@ -202,53 +197,81 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
         })
 
 async def transfer_chat_to_operators(
-        department_id: str,
-        conversation_id: str,
-        operator_id: Optional[str]=None,
-        timeout: float = 10.0
-    ):
-    url = f'https://salesiq.zoho.com/api/v2/{constants.SCREENNAME}/conversations/{conversation_id}/transfer'
-    ZOHO_ACCESS_TOKEN = os.getenv("ZOHO_ACCESS_TOKEN")
+    conversation_id: str,
+    department_id: str,
+    operator_id: Optional[str] = None,
+) -> dict:
+    """
 
-    Payload = {
-        "department_id" : "19000000000017",
-        "operator_id" : "19000000026003",
-        "note":"The previous deal was closed"
+    Tool terminal: transfers the conversation to a human advisor.
+
+    """
+    url = (
+        f"https://salesiq.zoho.com/api/v2/{constants.SCREENNAME}/conversations/{conversation_id}/transfer"
+    )
+
+    payload = {
+        "department_id": department_id,
+        "note": constants.CLOSED_CONVERSATION_NOTE
     }
 
+    if operator_id:
+        payload["operator_id"] = operator_id
+
     headers = {
-        "Authorization": f"Zoho-oauthtoken {ZOHO_ACCESS_TOKEN}",
+        "Authorization": f"Zoho-oauthtoken {os.getenv('ZOHO_ACCESS_TOKEN')}",
         "Content-Type": "application/json"
     }
 
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(url=url, json=Payload, headers=headers)
-    except httpx.RequestError as e:
-        logger.error(
-            "Zoho connection error",
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            logger.info(f"📤 Zoho transfer URL: {url}")
+            logger.info(f"📤 Zoho transfer payload: {payload}")
+            resp = await client.post(url, json=payload, headers=headers)
+            logger.info(f"📥 Zoho transfer response code: {resp.status_code}")
+            logger.info(f"📥 Zoho transfer response body: {resp.text}")
+
+        if resp.status_code not in (200, 204):
+            logger.error(
+                "Zoho agent transfer failed",
+                extra={
+                    "conversation_id": conversation_id,
+                    "status": resp.status_code,
+                    "response": resp.text,
+                }
+            )
+            return {
+                "status": "error",
+                "reason": "zoho_api_error",
+                "conversation_closed": False,
+            }
+
+        logger.info(
+            "Conversation transferred",
             extra={
-                "url": url,
-                "error": str(e)
+                "conversation_id": conversation_id,
+                "department_id": department_id,
+                "operator_id": operator_id,
             }
         )
-        raise HTTPException(
-            status_code=502,
-            detail=f"Zoho connection error: {str(e)}"
-        )
-    
-    if resp.status_code not in (200, 204):
-        logger.error(
-            "Zoho API error",
+        return {
+            "status": "success",
+            "conversation_closed": True,
+        }
+    except Exception as e:
+        logger.exception(
+            "zoho_agent_transfer_exception",
             extra={
-                "url": url,
-                "status": resp.status_code,
-            }
+                "conversation_id": conversation_id,
+                "error": str(e),
+            },
         )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Zoho API error {resp.status_code}: {resp.text}"
-        )
+
+        return {
+            "status": "error",
+            "reason": "exception",
+            "conversation_closed": False,
+        }
 
 tools = [
     {
@@ -326,5 +349,44 @@ tools = [
                 "required": ["name_surgery_or_treatment"],
             },
         }
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "transfer_chat_to_operators",
+            "description":  (
+                "Transfers the active conversation to a human agent in Zoho SalesIQ. "
+                "This is a terminal action: once executed successfully, the assistant must stop responding "
+                "and the conversation is handled by a human operator."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "conversation_id": {
+                        "type": "string",
+                        "description": (
+                            "Zoho SalesIQ conversation identifier."
+                            "This value uniquely identifies the active chat session"
+                            "and is used by the backend to route or transfer the conversation."
+                        ),
+                    },
+                    "department_id": {
+                        "type": "string",
+                        "description": (
+                            "Zoho SalesIQ department identifier. "
+                            "This value specifies the department to which the active chat will be transferred."
+                        ),
+                    },                    
+                    "operator_id": {
+                        "type": "string",
+                        "description": (
+                            "Optional Zoho SalesIQ operator ID. "
+                            "If omitted, Zoho will assign any available operator in the specified department."
+                        ),
+                    },
+                },
+                "required": ["department_id"],
+            },
+        }
+    },
 ]

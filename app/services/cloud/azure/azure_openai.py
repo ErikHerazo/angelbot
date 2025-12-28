@@ -5,11 +5,13 @@ import asyncio
 from azure.core.exceptions import HttpResponseError
 
 from app.core import constants
-from app.services.cloud.azure import azure_tools
-from app.services.cloud.azure.client import get_azure_openai_client
 from app.core.logging_config import logger
-
+from app.services.cloud.azure import azure_tools
 from app.services.cache.session_memory import SessionMemoryRedis
+from app.services.cloud.azure.client import get_azure_openai_client
+from app.services.chat.context.conversation_context import ConversationContext
+from app.services.chat.context import context_prompt
+
 
 session_memory = SessionMemoryRedis()
 MAX_HISTORY = 6
@@ -43,7 +45,7 @@ async def call_with_retry(func, *args, **kwargs):
 
     raise Exception("🚫 Excedido el número máximo de reintentos con Azure OpenAI.")
 
-async def run_conversation_with_rag(session_id: str, user_question: str):
+async def run_conversation_with_rag(context: ConversationContext, user_question: str):
     """
     Ejecuta una conversación con Azure OpenAI usando RAG + llamadas a funciones paralelas.
     Compatible con el patrón de function calling documentado por Azure.
@@ -52,13 +54,13 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
     client = get_azure_openai_client()
 
     # 🧠 Recuperar historial de conversación desde Redis
-    history = await session_memory.get_session(session_id)
+    history = await session_memory.get_session(context.session_id)
     # logger.info(f"📝 Historial recuperado desde Redis: {history}")
     if not history:
         history = []
 
     # Construir el contexto inicial
-    messages = [{"role": "system", "content": constants.ASSISTANT_PROMPT}]
+    messages = [{"role": "system", "content": constants.ASSISTANT_PROMPT}, context_prompt.context_to_system_message(context)]
     messages.extend(history)
     messages.append({"role": "user", "content": user_question})
 
@@ -131,9 +133,16 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
             # Ejecutar función correspondiente
             try:
                 if function_name == "is_customer_service_available":
-                    function_response = azure_tools.is_customer_service_available(
+                    function_response_str = azure_tools.is_customer_service_available(
                         input=function_args.get("input")
                     )
+                    function_response = json.loads(function_response_str)
+                    if function_response.get("available"):
+                        transfer_result = await azure_tools.transfer_chat_to_operators(
+                            conversation_id = context.conversation_id, 
+                            department_id = constants.CUSTOMER_SUPPORT_DEPARTMENT_ID,
+                        )
+                        logger.info(f"Chat transferred automatically: {transfer_result}")
                 elif function_name == "save_user":
                     function_response = azure_tools.save_user(
                         name=function_args.get("name"),
@@ -145,17 +154,16 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
                     )
                 else:
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
-
             except Exception as e:
                 logger.exception(f"💥 Error ejecutando función {function_name}: {e}")
                 function_response = json.dumps({"error": str(e)})
 
-            # Registrar respuesta del tool
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": function_response
-            })
+            # # Registrar respuesta del tool
+            # messages.append({
+            #     "role": "tool",
+            #     "tool_call_id": tool_call.id,
+            #     "content": function_response
+            # })
 
     else:
         logger.info("ℹ️ No se detectaron tool calls en la respuesta inicial.")
@@ -182,7 +190,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
         history = history[-MAX_HISTORY:]
 
     await session_memory.connect()
-    await session_memory.save_session(session_id, history)
+    await session_memory.save_session(context.session_id, history)
 
     logger.info(f"💬 ================ Respuesta final: {final_message.content}")
     return final_message.content

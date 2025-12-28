@@ -25,6 +25,7 @@ def handle_message(zoho_message: ZohoMessage):
         process_message_async(
             request_id=zoho_message.request_id,
             session_id=session_id,
+            conversation_id=zoho_message.conversation_id,
             user_question=zoho_message.user_question
         )
     )
