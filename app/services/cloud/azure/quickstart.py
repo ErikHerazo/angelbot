@@ -4,7 +4,7 @@ import dotenv
 
 dotenv.load_dotenv()
 
-endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT_MAIN")
+endpoint = os.environ.get("OPENAI_BASE_URL")
 api_key = os.environ.get("AZURE_OPENAI_API_KEY_MAIN")
 deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
 
