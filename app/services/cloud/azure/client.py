@@ -9,17 +9,18 @@ def get_azure_openai_client() -> AsyncAzureOpenAI:
     y el endpoint especificados en las variables de entorno.
 
     Variables de entorno necesarias:
-        - AZURE_OPENAI_ENDPOINT_MAIN: URL del recurso Azure OpenAI.
+        # - AZURE_OPENAI_ENDPOINT_MAIN: URL del recurso Azure OpenAI.
+        - OPENAI_BASE_URL: URL de APIM
         - AZURE_OPENAI_API_KEY_MAIN: Clave de API para autenticar el cliente.
 
     Returns:
         AsyncAzureOpenAI: Instancia del cliente listo para realizar llamadas a la API.
     """
     # Obtenemos la URL del endpoint de Azure OpenAI desde las variables de entorno
-    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT_MAIN")
+    endpoint = os.getenv("OPENAI_BASE_URL")
     
     # Obtenemos la clave de API desde las variables de entorno
-    api_key = os.getenv("AZURE_OPENAI_API_KEY_MAIN")
+    api_key = os.getenv("API_KEY")
 
     # Creamos la instancia del cliente Azure OpenAI con la versión de API deseada
     client = AsyncAzureOpenAI(
