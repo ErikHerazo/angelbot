@@ -105,5 +105,5 @@ ZOHOSALESIQ_SERVER_URI = "salesiq.zoho.eu"
 
 PENDING_PAYLOAD = {
     "action": "pending",
-    "replies": ["I am processing your request..."]
+    "replies": ["⏳ Procesando tu solicitud, un momento por favor…"]
 }
