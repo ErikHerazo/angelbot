@@ -31,13 +31,13 @@ async def is_customer_service_available(input: str = "") -> bool:
         return False
 
     # Horario de lunes a viernes
-    if 0 <= dia_semana <= 4:
-        if time(8,0) <= now.time() <= time(12,0) or time(14,0) <= now.time() <= time(18,0):
+    if 0 <= dia_semana <= 3:
+        if time(10,30) <= now.time() <= time(14,0) or time(15,30) <= now.time() <= time(19,0):
             return True
 
     # Horario sábado
-    if dia_semana == 5:
-        if time(8,0) <= now.time() <= time(12,0):
+    if dia_semana == 4:
+        if time(10,30) <= now.time() <= time(14,0):
             return True
 
     return False
