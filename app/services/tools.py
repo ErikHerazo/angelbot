@@ -16,9 +16,9 @@ async def is_customer_service_available(input: str = "") -> bool:
     
     Retorna True si estamos dentro del horario de atención, False si no.
     Horarios de atención:
-      - Lunes a viernes: 08:00-12:00 y 14:00-18:00
-      - Sábado: 08:00-12:00
-      - Domingos y festivos: no disponible
+      - Lunes a jueves: 10:30-13:30 y 15:30-19:00
+      - viernes: 10:30-13:30
+      - Sabados, Domingos y festivos: no disponible
     """
     now = get_current_time_spain()
     dia_semana = now.weekday()  # Lunes=0, Domingo=6
@@ -32,7 +32,7 @@ async def is_customer_service_available(input: str = "") -> bool:
 
     # Horario de lunes a viernes
     if 0 <= dia_semana <= 3:
-        if time(10,30) <= now.time() <= time(14,0) or time(15,30) <= now.time() <= time(19,0):
+        if time(10,30) <= now.time() <= time(13,30) or time(15,30) <= now.time() <= time(19,0):
             return True
 
     # Horario sábado
