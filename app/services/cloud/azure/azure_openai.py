@@ -5,18 +5,20 @@ import asyncio
 from azure.core.exceptions import HttpResponseError
 
 from app.core import constants
-from app.services.cloud.azure import azure_tools
-from app.services.cloud.azure.client import get_azure_openai_client
 from app.core.logging_config import logger
 
+from app.services.cloud.azure import azure_tools
+from app.services.cloud.azure.client import get_azure_openai_client
+
 from app.services.cache.session_memory import SessionMemoryRedis
+from app.core.utils.language_detector import resolve_language
 
 session_memory = SessionMemoryRedis()
 MAX_HISTORY = 6
 
 async def call_with_retry(func, *args, **kwargs):
     """
-    Wrapper con retry/backoff + jitter para manejar errores 429 o 503.
+    Wrapper with retry/backoff + jitter to handle 429 or 503 errors.
     """
     for attempt in range(1, constants.OPENAI_MAX_RETRIES + 1):
         try:
@@ -41,24 +43,41 @@ async def call_with_retry(func, *args, **kwargs):
             logger.exception(f"💥 Excepción inesperada en intento {attempt}: {e}")
             await asyncio.sleep(1.0 * (2 ** (attempt - 1)))
 
-    raise Exception("🚫 Excedido el número máximo de reintentos con Azure OpenAI.")
+    raise Exception("🚫 Maximum number of retries exceeded with Azure OpenAI.")
 
 async def run_conversation_with_rag(session_id: str, user_question: str):
     """
-    Ejecuta una conversación con Azure OpenAI usando RAG + llamadas a funciones paralelas.
-    Compatible con el patrón de function calling documentado por Azure.
+    Execute a conversation with Azure OpenAI using RAG + parallel function calls.
+    Compatible with the function calling pattern documented by Azure.
     """
     deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
     client = get_azure_openai_client()
 
-    # 🧠 Recuperar historial de conversación desde Redis
+    lang = "es"
+    
+    if len(user_question.strip()) >= constants.MIN_LANG_DETECTION_LEN:
+        result = resolve_language(user_question)
+        if result in constants.SUPPORTED_LANGUAGES:
+            lang=result
+            logger.info(f"🌍 Idioma detectado: {lang}")
+        else:
+            lang=lang
+            logger.info(f"🌍 Idioma cuando no lo detecta: {lang}")
+    else:
+        logger.info(f"🌍 Idioma cuando no entra a la validacion: {lang}")
+
+    # 🧠 Retrieve conversation history from Redis
     history = await session_memory.get_session(session_id)
-    # logger.info(f"📝 Historial recuperado desde Redis: {history}")
+    # logger.info(f"📝 History retrieved from Redis: {history}")
     if not history:
         history = []
 
-    # Construir el contexto inicial
-    messages = [{"role": "system", "content": constants.ASSISTANT_PROMPT}]
+    # Building the initial context
+    system_prompt = constants.ASSISTANT_PROMPT.strip()
+    print(f"===== 🌍 Promt\n{system_prompt}")
+    system_prompt += f'\n- IMPORTANTE: Responde en el idioma "{lang}". Si el idioma no está soportado, entrega la respuesta de la pregunta en español.'
+    print(f"===== 🌍 Nuevo Promt\n{system_prompt}")
+    messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
     messages.append({"role": "user", "content": user_question})
 
@@ -66,8 +85,8 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
 
     async def make_completion(messages, max_toks, force_text=False):
         """
-        Realiza una llamada a Azure OpenAI ChatCompletion.
-        Si `force_text=True`, se fuerza tool_choice='none' para evitar más tool calls.
+        Make a call to Azure OpenAI ChatCompletion.
+        If `force_text=True`, force tool_choice='none' to prevent further tool calls.
         """
         return await client.chat.completions.create(
             model=deployment_name,
@@ -103,7 +122,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
             },
         )
 
-    # 🌀 Primera llamada con retry
+    # 🌀 First call with retry
     response = await call_with_retry(make_completion, messages, max_toks)
     response_message = response.choices[0].message
     logger.info(f"📌 RESPONSE RAW: {response_message}")
@@ -113,9 +132,9 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
         "content": response_message.content or "",
     })
 
-    # logger.info("🧠 Respuesta inicial recibida.")
+    # logger.info("🧠 Initial response received.")
 
-    # 🚀 Manejo de llamadas paralelas (parallel tool calls)
+    # 🚀 Parallel call control (parallel tool calls)
     if response_message.tool_calls:
         # print("============= HAY LLAMADO DE FUNCIONES ============================")
         for tool_call in response_message.tool_calls:
@@ -123,12 +142,12 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
             try:
                 function_args = json.loads(tool_call.function.arguments)
             except Exception:
-                logger.warning(f"⚠️ Argumentos inválidos para {function_name}: {tool_call.function.arguments}")
+                logger.warning(f"⚠️ Invalid arguments for {function_name}: {tool_call.function.arguments}")
                 continue
 
             logger.info(f"🧩 Tool Call: {function_name} | Args: {function_args}")
 
-            # Ejecutar función correspondiente
+            # Execute corresponding function
             try:
                 if function_name == "is_customer_service_available":
                     function_response = azure_tools.is_customer_service_available(
@@ -147,10 +166,10 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 
             except Exception as e:
-                logger.exception(f"💥 Error ejecutando función {function_name}: {e}")
+                logger.exception(f"💥 Error executing function {function_name}: {e}")
                 function_response = json.dumps({"error": str(e)})
 
-            # Registrar respuesta del tool
+            # Record tool response
             messages.append({
                 "role": "tool",
                 "tool_call_id": tool_call.id,
@@ -158,31 +177,31 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
             })
 
     else:
-        logger.info("ℹ️ No se detectaron tool calls en la respuesta inicial.")
+        logger.info("ℹ️ No tool calls were detected in the initial response.")
         pass
 
-    # 🚦 Evitar loops de tool calls: fuerza respuesta textual
+    # 🚦 Avoid tool call loops: force textual response
     final_response = await call_with_retry(make_completion, messages, max_toks, force_text=True)
     final_message = final_response.choices[0].message
 
-    # ✅ Validar respuesta final
+    # ✅ Validate final response
     if not final_message.content:
-        logger.warning("⚠️ El modelo devolvió content=None. Detalles:")
+        logger.warning("⚠️ The model returned content=None. Details:")
         logger.warning(final_message)
         return "⚠️ No se pudo generar una respuesta válida en este momento. Intenta nuevamente."
     
-    # 💾 Guardar conversación en Redis (solo últimos N mensajes)
+    # 💾 Save conversation in Redis (only the last N messages)
     history.extend([
         {"role": "user", "content": user_question},
         {"role": "assistant", "content": final_message.content}
     ])
 
-    # mantener sólo los últimos N mensajes
+    # keep only the last N messages
     if len(history) > MAX_HISTORY:
         history = history[-MAX_HISTORY:]
 
     await session_memory.connect()
     await session_memory.save_session(session_id, history)
 
-    logger.info(f"💬 ================ Respuesta final: {final_message.content}")
+    logger.info(f"💬 ================ Final answer: {final_message.content}")
     return final_message.content
