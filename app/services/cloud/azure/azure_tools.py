@@ -16,27 +16,42 @@ def get_current_time_spain() -> datetime:
 
 def is_customer_service_available(input: str = ""):
     now = get_current_time_spain()
-    dia_semana = now.weekday()  # Lunes=0, Domingo=6
+    weekday = now.weekday()   # 0=Lunes, 6=Domingo
+    current_time = now.time()
+    today = now.date()
+
     es_holidays = holidays.Spain(years=now.year)
 
-    # Domingo o festivo
-    if dia_semana == 6 or now.date() in es_holidays:
+    # Día no laboral
+    if weekday == 6 or today in es_holidays:
         return json.dumps({
-            "message": "El servicio de atención al cliente no está disponible hoy (domingo o festivo)."
+            "available": False,
+            "message": "En este momento el servicio de atención al cliente no está disponible."
         })
 
-    # Horario laboral
-    message = "El servicio de atención al cliente no está disponible en este momento."
+    # Lunes a jueves
+    if 0 <= weekday <= 3:
+        if (
+            time(10, 30) <= current_time <= time(14, 0)
+            or time(15, 30) <= current_time <= time(19, 0)
+        ):
+            return json.dumps({
+                "available": True,
+                "message": "El servicio de atención al cliente está disponible en este momento."
+            })
 
-    if 0 <= dia_semana <= 4:
-        if time(8, 0) <= now.time() <= time(12, 0) or time(14, 0) <= now.time() <= time(18, 0):
-            message = "El servicio de atención al cliente está disponible actualmente."
-    elif dia_semana == 5:
-        if time(8, 0) <= now.time() <= time(12, 0):
-            message = "El servicio de atención al cliente está disponible actualmente."
+    # Viernes
+    if weekday == 4:
+        if time(10, 30) <= current_time <= time(14, 0):
+            return json.dumps({
+                "available": True,
+                "message": "El servicio de atención al cliente está disponible en este momento."
+            })
 
-    return json.dumps({"message": message})
-
+    return json.dumps({
+        "available": False,
+        "message": "En este momento el servicio de atención al cliente no está disponible."
+    })
 
 # def is_customer_service_available(input: str = ""):
 #     """
