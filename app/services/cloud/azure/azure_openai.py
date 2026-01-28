@@ -75,7 +75,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
     # Building the initial context
     system_prompt = constants.ASSISTANT_PROMPT.strip()
     print(f"===== 🌍 Promt\n{system_prompt}")
-    system_prompt += f'\n- IMPORTANTE: Responde en el idioma "{lang}". Si el idioma no está soportado, entrega la respuesta de la pregunta en español.'
+    system_prompt += f'\n- IMPORTANTE: Responde en el idioma "{lang}". SI el idioma no está soportado, ENTONCES responde en español.'
     print(f"===== 🌍 Nuevo Promt\n{system_prompt}")
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
