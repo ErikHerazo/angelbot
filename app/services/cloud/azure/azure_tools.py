@@ -14,7 +14,7 @@ def get_current_time_spain() -> datetime:
     madrid_tz = ZoneInfo("Europe/Madrid")
     return datetime.now(madrid_tz)
 
-def is_customer_service_available(input: str = ""):
+def is_customer_service_available(input: str=""):
     now = get_current_time_spain()
     weekday = now.weekday()   # 0=Lunes, 6=Domingo
     current_time = now.time()
@@ -26,7 +26,7 @@ def is_customer_service_available(input: str = ""):
     if weekday == 6 or today in es_holidays:
         return json.dumps({
             "available": False,
-            "message": "En este momento el servicio de atención al cliente no está disponible."
+            "message": "Servicio de atención al cliente no disponible."
         })
 
     # Lunes a jueves
@@ -37,7 +37,7 @@ def is_customer_service_available(input: str = ""):
         ):
             return json.dumps({
                 "available": True,
-                "message": "El servicio de atención al cliente está disponible en este momento."
+                "message": "Servicio de atención al cliente disponible."
             })
 
     # Viernes
@@ -45,12 +45,12 @@ def is_customer_service_available(input: str = ""):
         if time(10, 30) <= current_time <= time(14, 0):
             return json.dumps({
                 "available": True,
-                "message": "El servicio de atención al cliente está disponible en este momento."
+                "message": "Servicio de atención al cliente disponible."
             })
 
     return json.dumps({
         "available": False,
-        "message": "En este momento el servicio de atención al cliente no está disponible."
+        "message": "Servicio de atención al cliente no disponible."
     })
 
 # def is_customer_service_available(input: str = ""):
@@ -219,6 +219,7 @@ tools = [
             "name": "is_customer_service_available",
             "description": "Comprueba si el servicio de atención al cliente está disponible actualmente en España. "
                             "Utilízala cuando el usuario pregunte si puede ser atendido por un asesor, "
+                            "si el usuario quiere reservar una cita, "
                             "si hay soporte disponible, o si el horario de atención está activo. "
                             "Devuelve True si el servicio está disponible en este momento, de lo contrario False.",
             "parameters": {
