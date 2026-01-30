@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
-
+from app.core import constants
 
 @dataclass
 class ZohoMessage:
@@ -17,7 +17,16 @@ def parse_zoho_payload(body: dict) -> ZohoMessage:
 
     request_id = body.get("request", {}).get("id")
     session_id = visitor.get("visitor_id")
-    user_question = message.get("text") or visitor.get("question")
+
+    meta = message.get("meta") or {}
+    card_data = meta.get("card_data")
+
+    if card_data and card_data.get("id") == "continue":
+        user_question = constants.CONTINUE_TOKEN
+    elif message.get("text"):
+        user_question=message["text"]
+    else:
+        user_question = None
 
     return ZohoMessage(
         handler=handler,

@@ -55,7 +55,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
 
     lang = "es"
     
-    if len(user_question.strip()) >= constants.MIN_LANG_DETECTION_LEN:
+    if len(user_question.strip()) >= constants.MIN_LANG_DETECTION_LEN and user_question != constants.CONTINUE_TOKEN:
         result = resolve_language(user_question)
         if result in constants.SUPPORTED_LANGUAGES:
             lang=result
@@ -79,7 +79,9 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
     print(f"===== 🌍 Nuevo Promt\n{system_prompt}")
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
-    messages.append({"role": "user", "content": user_question})
+
+    if user_question is not constants.CONTINUE_TOKEN:
+        messages.append({"role": "user", "content": user_question})
 
     max_toks = constants.OPENAI_MAX_TOKENS if len(user_question) > 200 else int(constants.OPENAI_MAX_TOKENS / 3)
 
