@@ -81,3 +81,5 @@ SUPPORTED_LANGUAGES = {
   "zh","ar","tr","ja","sw","cy","ko","is","bn","ur","ne",
   "th","pa","mr","te"
 }
+
+CONTINUE_TOKEN = "__CONTINUE__"
