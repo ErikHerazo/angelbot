@@ -9,9 +9,11 @@ from app.core.logging_config import logger
 
 from app.services.cloud.azure import azure_tools
 from app.services.cloud.azure.client import get_azure_openai_client
-
 from app.services.cache.session_memory import SessionMemoryRedis
+
 from app.core.utils.language_detector import resolve_language
+from app.core.utils.text_cleaner import remove_doc_refs
+
 
 session_memory = SessionMemoryRedis()
 MAX_HISTORY = 6
@@ -128,7 +130,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
     response = await call_with_retry(make_completion, messages, max_toks)
     response_message = response.choices[0].message
     logger.info(f"📌 RESPONSE RAW: {response_message}")
-
+    print(f"============== respuesta sin limpiar: {response_message.content}")
     messages.append({
         "role": response_message.role,
         "content": response_message.content or "",
@@ -191,11 +193,11 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
         logger.warning("⚠️ The model returned content=None. Details:")
         logger.warning(final_message)
         return "⚠️ No se pudo generar una respuesta válida en este momento. Intenta nuevamente."
-    
+    clean_content = remove_doc_refs(final_message.content)
     # 💾 Save conversation in Redis (only the last N messages)
     history.extend([
         {"role": "user", "content": user_question},
-        {"role": "assistant", "content": final_message.content}
+        {"role": "assistant", "content": clean_content}
     ])
 
     # keep only the last N messages
@@ -205,5 +207,5 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
     await session_memory.connect()
     await session_memory.save_session(session_id, history)
 
-    logger.info(f"💬 ================ Final answer: {final_message.content}")
-    return final_message.content
+    logger.info(f"💬 ================ Final answer: {clean_content}")
+    return clean_content
