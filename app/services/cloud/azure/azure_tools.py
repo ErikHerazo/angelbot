@@ -1,13 +1,17 @@
+import os
 import re
 import json
 import holidays
+import requests
 import unicodedata
 from zoneinfo import ZoneInfo
+from dotenv import load_dotenv
 from datetime import datetime, time
 from app.services.db import connection
 from app.core.logging_config import logger
-from app.services.cloud.azure.azure_blob import AzureBlobService
 
+
+load_dotenv()
 
 # Obtener hora actual de España
 def get_current_time_spain() -> datetime:
@@ -26,7 +30,9 @@ def is_customer_service_available(input: str=""):
     if weekday == 6 or today in es_holidays:
         return json.dumps({
             "available": False,
-            "message": "Servicio de atención al cliente no disponible."
+            "message": (
+                "Servicio de atencion al cliente no disponible."
+            )
         })
 
     # Lunes a jueves
@@ -37,7 +43,9 @@ def is_customer_service_available(input: str=""):
         ):
             return json.dumps({
                 "available": True,
-                "message": "Servicio de atención al cliente disponible."
+                "message": (
+                    "Servicio de atencion al cliente disponible. "
+                )
             })
 
     # Viernes
@@ -45,12 +53,16 @@ def is_customer_service_available(input: str=""):
         if time(10, 30) <= current_time <= time(14, 0):
             return json.dumps({
                 "available": True,
-                "message": "Servicio de atención al cliente disponible."
+                "message": (
+                    "Servicio de atencion al cliente disponible. "
+                )
             })
 
     return json.dumps({
         "available": False,
-        "message": "Servicio de atención al cliente no disponible."
+        "message": (
+            "Servicio de atencion al cliente no disponible. "
+        )
     })
 
 # def is_customer_service_available(input: str = ""):
@@ -168,43 +180,47 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
       - Búsqueda por múltiples palabras sin importar el orden.
     Retorna un string JSON con los resultados y una nota aclaratoria indicando que los precios son referenciales.
     """
-
-    resultados = []
+    results = []
     query_words = normalize_text(name_surgery_or_treatment).split()
+    query_str = " ".join(query_words)
 
     if not query_words:
         return json.dumps({
             "mensaje": "No se proporcionó un nombre de cirugía o tratamiento válido.",
             "nota": "💡 Los precios del dataset son valores referenciales y pueden variar según el caso clínico."
         })
-
+    price_list_index=os.getenv("AZURE_AI_SEARCH_PRICE_LIST_INDEX")
+    azure_ai_search_api_key=os.getenv("AZURE_AI_SEARCH_API_KEY")
     try:
-        # Inicializamos el servicio de Blob
-        blob_service = AzureBlobService()
-
-        # Leemos el CSV remoto
-        df = blob_service.read_csv_from_blob()
-
-        # Concatenamos y normalizamos los campos de búsqueda
-        df['search_text'] = df[['procedure_name', 'synonyms', 'raw_text']].fillna('').agg(' '.join, axis=1)
-        df['search_text'] = df['search_text'].apply(normalize_text)
-
-        # Buscamos coincidencias que contengan todas las palabras de la query
-        for _, fila in df.iterrows():
-            if all(word in fila['search_text'] for word in query_words):
-                resultados.append(fila.to_dict())
-
-        if not resultados:
-            return json.dumps({
-                "mensaje": f"No se encontró ninguna cirugía o tratamiento con el nombre '{name_surgery_or_treatment}'.",
-                "nota": "💡 Los precios mostrados son aproximados y pueden variar según el procedimiento y la valoración médica."
-            })
-
-        return json.dumps({
-            "resultados": resultados,
-            "nota": "💡 Los precios listados son valores aproximados del dataset médico y pueden variar según el paciente, la clínica y el contexto del tratamiento."
-        })
-
+        url = f"https://agb-search.search.windows.net/indexes/{price_list_index}/docs/search?api-version=2025-11-01-preview"
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": azure_ai_search_api_key
+        }
+        payload = {
+            "search": query_str,
+            "count": True
+        }
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code != 200:
+            raise Exception(f"Search error: {response.status_code} - {response.text}")
+        
+        results = response.json()
+        
+        simplified ={
+            "found": True,
+            "results": [
+                {
+                    "procedure_name": doc.get("procedure_name", ""),
+                    "price_range": doc.get("price_range_eur", ""),
+                    "type_of_currency": "EUR"
+                }
+                for doc in results.get("value", [])
+            ],
+            "message": "Los precios indicados son aproximados y estan sujetos a cambios tras la valoracion medica especializada. "
+        }
+        return json.dumps(simplified, indent=2)
     except Exception as e:
         logger.error(f"❌ Error en procedures_and_treatments_price_list: {e}")
         return json.dumps({
