@@ -47,7 +47,7 @@ async def call_with_retry(func, *args, **kwargs):
 
     raise Exception("🚫 Maximum number of retries exceeded with Azure OpenAI.")
 
-async def run_conversation_with_rag(session_id: str, user_question: str):
+async def run_conversation_with_rag(session_id: str, user_question: str, channel: str="website"):
     """
     Execute a conversation with Azure OpenAI using RAG + parallel function calls.
     Compatible with the function calling pattern documented by Azure.
@@ -75,10 +75,15 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
         history = []
 
     # Building the initial context
-    system_prompt = constants.ASSISTANT_PROMPT.strip()
-    print(f"===== 🌍 Promt\n{system_prompt}")
-    system_prompt += f'\n- IMPORTANTE: Responde en el idioma "{lang}". SI el idioma no está soportado, ENTONCES responde en español.'
-    print(f"===== 🌍 Nuevo Promt\n{system_prompt}")
+    if channel == "website":
+        print(f"============ CHANNEL: {channel}")
+        system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
+    elif channel == "whatsapp":
+        print(f"============ CHANNEL: {channel}")
+        system_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
+    # print(f"===== 🌍 Promt\n{system_prompt}")
+    # system_prompt += f'\n- IMPORTANTE: RECUERDA SIEMPRE Responder en el idioma "{lang}". SI el idioma no está soportado, ENTONCES responde en español.'
+    # print(f"===== 🌍 Nuevo Promt\n{system_prompt}")
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
 
@@ -130,7 +135,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str):
     response = await call_with_retry(make_completion, messages, max_toks)
     response_message = response.choices[0].message
     logger.info(f"📌 RESPONSE RAW: {response_message}")
-    print(f"============== respuesta sin limpiar: {response_message.content}")
+    # print(f"============== respuesta sin limpiar: {response_message.content}")
     messages.append({
         "role": response_message.role,
         "content": response_message.content or "",
