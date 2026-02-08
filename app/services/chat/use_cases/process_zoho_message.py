@@ -13,6 +13,7 @@ async def process_zoho_message(
     request_id: str,
     session_id: str,
     user_question: str,
+    channel: str,
     rag_runner,
 ):
     logger.info(
@@ -20,6 +21,7 @@ async def process_zoho_message(
         extra={
             "request_id": request_id,
             "session_id": session_id,
+            "channel": channel,
         },
     )
 
@@ -28,7 +30,7 @@ async def process_zoho_message(
 
     # 2) Generate answer (RAG)
     try:
-        answer = await rag_runner(session_id, user_question)
+        answer = await rag_runner(session_id, user_question, channel)
     except Exception:
         logger.exception("RAG failed", extra={"request_id": request_id})
     

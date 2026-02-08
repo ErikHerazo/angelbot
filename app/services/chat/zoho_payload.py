@@ -8,6 +8,7 @@ class ZohoMessage:
     request_id: Optional[str]
     session_id: str
     user_question: Optional[str]
+    channel: str
     raw: dict
 
 def parse_zoho_payload(body: dict) -> ZohoMessage:
@@ -17,6 +18,7 @@ def parse_zoho_payload(body: dict) -> ZohoMessage:
 
     request_id = body.get("request", {}).get("id")
     session_id = visitor.get("visitor_id")
+    channel = visitor.get("channel")
 
     meta = message.get("meta") or {}
     card_data = meta.get("card_data")
@@ -33,5 +35,6 @@ def parse_zoho_payload(body: dict) -> ZohoMessage:
         request_id=request_id,
         session_id=session_id,
         user_question=user_question,
+        channel=channel,
         raw=body,
     )
