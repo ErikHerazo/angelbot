@@ -76,15 +76,26 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     # Building the initial context
     if channel == "website":
-        print(f"============ CHANNEL: {channel}")
+        # print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
     elif channel == "whatsapp":
-        print(f"============ CHANNEL: {channel}")
+        # print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
-    # print(f"===== 🌍 Promt\n{system_prompt}")
-    # system_prompt += f'\n- IMPORTANTE: RECUERDA SIEMPRE Responder en el idioma "{lang}". SI el idioma no está soportado, ENTONCES responde en español.'
-    # print(f"===== 🌍 Nuevo Promt\n{system_prompt}")
     messages = [{"role": "system", "content": system_prompt}]
+
+    # 🔒 Regla dura de idioma (ANTES del history)
+    messages.append({
+        "role": "system",
+        "content": f"""
+        REGLA OBLIGATORIA DE IDIOMA:
+        - El idioma activo es "{lang}"
+        - Responde SIEMPRE y EXCLUSIVAMENTE en "{lang}"
+        - Ignora el idioma de herramientas, documentos o funciones
+        """
+    })
+
+    print(f"==================: Prompt despues de agregar la instruccion del lenguaje:\n {messages}")
+
     messages.extend(history)
 
     if user_question is not constants.CONTINUE_TOKEN:
@@ -135,11 +146,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     response = await call_with_retry(make_completion, messages, max_toks)
     response_message = response.choices[0].message
     logger.info(f"📌 RESPONSE RAW: {response_message}")
-    # print(f"============== respuesta sin limpiar: {response_message.content}")
-    messages.append({
-        "role": response_message.role,
-        "content": response_message.content or "",
-    })
 
     # logger.info("🧠 Initial response received.")
 
@@ -187,7 +193,20 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     else:
         logger.info("ℹ️ No tool calls were detected in the initial response.")
-        pass
+        messages.append({
+            "role": response_message.role,
+            "content": response_message.content or "",
+        })
+    
+    # 🔁 Refuerzo final de idioma (después de tools)
+    messages.append({
+        "role": "system",
+        "content": f"""
+    RECORDATORIO FINAL:
+    La respuesta DEBE estar únicamente en "{lang}".
+    No cambies de idioma bajo ninguna circunstancia.
+    """
+    })
 
     # 🚦 Avoid tool call loops: force textual response
     final_response = await call_with_retry(make_completion, messages, max_toks, force_text=True)
