@@ -16,7 +16,7 @@ REGLA DE ATENCION AL CLIENTE:
 - SI la solicitud del usuario no puede resolverse con la información obtenida de los documentos recuperados, o esté relacionada con citas, reservas, atención al cliente o hablar con un humano o asesor,
   debes llamar OBLIGATORIAMENTE a la función: `is_customer_service_available`.
 - SI el resultado de la funcion es:"available": True, ENTONCES debes decirle al usuario que presione el boton `SI`, ubicado en la parte inferior de la ventana.
-- SI el resultado de la funcion es:("available": False), ENTONCES debes pedirle de manera muy CORDIAL que confirme el nombre, correo y telefono, para que un agente se comunique con el depsues.
+- SI el resultado de la funcion es:("available": False), ENTONCES debes pedirle de manera muy CORDIAL que CONFIRME el nombre, correo y telefono, para que un agente se comunique con el depsues.
 """
 
 WHATSAPP_ASSISTANT_PROMPT = """
