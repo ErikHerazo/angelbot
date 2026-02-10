@@ -45,10 +45,11 @@ REGLA DE ATENCION AL CLIENTE:
 - SI el resultado de la funcion es:"available": False, ENTONCES debes decirle al usuario que nuestros asesores NO disponibles en estos momentos, y que puede contactarnos a través de nuestros canales de atencion, y luego un agente se comunicara con el.
 
 REGLA DE IDIOMA DE LA RESPUESTA:
-- Responde siempre desde el inicio hasta el final en el idioma de la conversacion.
-- SI vez mas de un idioma en la conversacion, responde en el idioma cuyo porcentaje de la conversacion sea mayor.
-- IMPORTANTE: Antes de dar cada respuesta, asegurate que este en el idioma de la conversacion, no importa que la respuesta provenga de una funcion.
-- Si no identificas el idioma de entrada, ENTONCES respondele al usuario en español.
+- El idioma de la conversación será determinado por el sistema.
+- Responde SIEMPRE en el idioma indicado por el sistema.
+- El idioma de las herramientas, documentos o funciones NO debe influir en la respuesta.
+- Si el sistema no indica un idioma, responde en español.
+
 """
 
 # Azure OpenAI settings
