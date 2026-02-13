@@ -81,18 +81,16 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     elif channel == "whatsapp":
         # print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
-    messages = [{"role": "system", "content": system_prompt}]
+    system_prompt = (
+        f"REGLA DE IDIOMA — PRIORIDAD MÁXIMA:\n"
+        f"- Debes responder exclusivamente en el idioma: `{lang}`.\n"
+        f"- Debes traducir cualquier contenido predefinido o plantilla al idioma indicado.\n"
+        f"- Esta regla anula cualquier otra instrucción previa de idioma.\n"
+        f"- Nunca expliques ni justifiques el idioma utilizado.\n\n"
+        f"{system_prompt}"
+    )
 
-    # 🔒 Regla dura de idioma (ANTES del history)
-    messages.append({
-        "role": "system",
-        "content": f"""
-        REGLA OBLIGATORIA DE IDIOMA:
-        - El idioma activo es "{lang}"
-        - Responde SIEMPRE y EXCLUSIVAMENTE en "{lang}"
-        - Ignora el idioma de herramientas, documentos o funciones
-        """
-    })
+    messages = [{"role": "system", "content": system_prompt}]
 
     print(f"==================: Prompt despues de agregar la instruccion del lenguaje:\n {messages}")
 
@@ -197,16 +195,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
             "role": response_message.role,
             "content": response_message.content or "",
         })
-    
-    # 🔁 Refuerzo final de idioma (después de tools)
-    messages.append({
-        "role": "system",
-        "content": f"""
-    RECORDATORIO FINAL:
-    La respuesta DEBE estar únicamente en "{lang}".
-    No cambies de idioma bajo ninguna circunstancia.
-    """
-    })
 
     # 🚦 Avoid tool call loops: force textual response
     final_response = await call_with_retry(make_completion, messages, max_toks, force_text=True)
@@ -231,5 +219,5 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     await session_memory.connect()
     await session_memory.save_session(session_id, history)
 
-    logger.info(f"💬 ================ Final answer: {clean_content}")
+    # logger.info(f"💬 ================ Final answer: {clean_content}")
     return clean_content
