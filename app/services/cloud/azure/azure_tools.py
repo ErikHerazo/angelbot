@@ -65,20 +65,6 @@ def is_customer_service_available(input: str=""):
         )
     })
 
-# def is_customer_service_available(input: str = ""):
-#     """
-#     Indica si el personal de servicio al cliente está disponible actualmente en la clinica.
-    
-#     Retorna un string JSON con:
-#       - available: True/False
-#       - message: texto explicativo que el modelo puede usar.
-#     """
-#     # return test available=True
-#     return json.dumps({
-#         "available": False,
-#         "message": "El servicio de atención al cliente no está disponible actualmente."
-#     })
-
 def ensure_users_table():
     """
     Ensures that the 'users' table exists in the database.
@@ -227,6 +213,7 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
             "error": f"Ocurrió un error leyendo el CSV desde Azure Blob: {str(e)}",
             "nota": "💡 Los precios del dataset son referenciales y pueden variar."
         })
+
 
 tools = [
     {
