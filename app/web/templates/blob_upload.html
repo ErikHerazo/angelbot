@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Upload file</title>
+
+  <!-- Bootstrap local -->
+  <link rel="stylesheet" href="/static/vendor/bootstrap/css/bootstrap.min.css">
+</head>
+<body class="bg-body-tertiary">
+
+<div class="container mt-5">
+  <h1 class="text-center mb-4">Document Upload</h1>
+  <h5 class="text-center text-muted mb-4">Cosmetic Surgery BCN</h5>
+
+  <div class="row">
+    <div class="col-md-6 mx-auto">
+
+      <div class="mb-3">
+        <label for="fileInput" class="form-label">select file</label>
+        <input class="form-control" type="file" id="fileInput">
+      </div>
+
+      <button id="uploadBtn" class="btn btn-primary w-100">Upload file</button>
+
+      <!-- Barra de progreso y mensajes -->
+      <div id="progressContainer" class="progress d-none mt-3">
+        <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+      </div>
+
+      <div id="successMsg" class="alert alert-success d-none mt-3">File ready to upload</div>
+      <div id="errorMsg" class="alert alert-danger d-none mt-3">Error when selecting file</div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById("uploadBtn").addEventListener("click", () => {
+  const fileInput = document.getElementById("fileInput");
+  const file = fileInput.files[0];
+
+  const progressContainer = document.getElementById("progressContainer");
+  const progressBar = document.getElementById("progressBar");
+  const successMsg = document.getElementById("successMsg");
+  const errorMsg = document.getElementById("errorMsg");
+
+  successMsg.classList.add("d-none");
+  errorMsg.classList.add("d-none");
+
+  if (!file) {
+    errorMsg.classList.remove("d-none");
+    return;
+  }
+
+  progressContainer.classList.remove("d-none");
+
+  // Simula progreso
+  let percent = 0;
+  const interval = setInterval(() => {
+    percent += 10;
+    progressBar.style.width = percent + "%";
+    progressBar.textContent = percent + "%";
+
+    if (percent >= 100) {
+      clearInterval(interval);
+      successMsg.classList.remove("d-none");
+    }
+  }, 100);
+});
+</script>
+
+<script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -2,16 +2,18 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from app.core import constants
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/upload",
+    tags=["upload"]
+)
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+templates = Jinja2Templates(directory=constants.WEB_DIR / "templates")
 
-templates = Jinja2Templates(directory="templates")
-
-@router.get("/upload-file", response_class=HTMLResponse)
+@router.get("/file", response_class=HTMLResponse)
 async def render_home(request: Request):
     return templates.TemplateResponse(
-        "upload.html",
+        "blob_upload.html",
         {"request": request}
     )

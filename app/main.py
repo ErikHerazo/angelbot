@@ -1,10 +1,11 @@
 import logging
 from fastapi import FastAPI
-from app.api.routes import chat_zoho_router
 from app.web.routes import home_router
+from fastapi.responses import FileResponse
+from app.api.routes import chat_zoho_router
+from app.web.routes import upload_file_router
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-
+from app.core import constants
 
 app = FastAPI(
     title="Angel Bot API",
@@ -19,9 +20,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=constants.WEB_DIR / "static"), name="static")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,7 +29,8 @@ logging.basicConfig(
 
 # app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_zoho_router, prefix="/api/chat", tags=["chat_zoho"])
-app.include_router(home_router, prefix="/web/chat", tags=["chat_zoho"])
+app.include_router(home_router, prefix="/web/chat", tags=["frontend"])
+app.include_router(upload_file_router, prefix="/web", tags=["upload"])
 
 @app.get("/")
 def read_root():
