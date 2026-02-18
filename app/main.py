@@ -30,7 +30,7 @@ logging.basicConfig(
 # app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_zoho_router, prefix="/api/chat", tags=["chat_zoho"])
 app.include_router(home_router, prefix="/web/chat", tags=["frontend"])
-app.include_router(upload_file_router, prefix="/web", tags=["upload"])
+app.include_router(upload_file_router, tags=["upload"])
 
 @app.get("/")
 def read_root():

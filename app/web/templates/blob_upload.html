@@ -37,39 +37,56 @@
 </div>
 
 <script>
-document.getElementById("uploadBtn").addEventListener("click", () => {
-  const fileInput = document.getElementById("fileInput");
-  const file = fileInput.files[0];
-
-  const progressContainer = document.getElementById("progressContainer");
-  const progressBar = document.getElementById("progressBar");
-  const successMsg = document.getElementById("successMsg");
-  const errorMsg = document.getElementById("errorMsg");
-
-  successMsg.classList.add("d-none");
-  errorMsg.classList.add("d-none");
-
-  if (!file) {
-    errorMsg.classList.remove("d-none");
-    return;
-  }
-
-  progressContainer.classList.remove("d-none");
-
-  // Simula progreso
-  let percent = 0;
-  const interval = setInterval(() => {
-    percent += 10;
-    progressBar.style.width = percent + "%";
-    progressBar.textContent = percent + "%";
-
-    if (percent >= 100) {
-      clearInterval(interval);
-      successMsg.classList.remove("d-none");
+  document.getElementById("uploadBtn").addEventListener("click", async () => {
+    const fileInput = document.getElementById("fileInput");
+    const file = fileInput.files[0];
+  
+    const progressContainer = document.getElementById("progressContainer");
+    const progressBar = document.getElementById("progressBar");
+    const successMsg = document.getElementById("successMsg");
+    const errorMsg = document.getElementById("errorMsg");
+  
+    successMsg.classList.add("d-none");
+    errorMsg.classList.add("d-none");
+  
+    if (!file) {
+      errorMsg.textContent = "No file selected";
+      errorMsg.classList.remove("d-none");
+      return;
     }
-  }, 100);
-});
-</script>
+  
+    progressContainer.classList.remove("d-none");
+    progressBar.style.width = "0%";
+    progressBar.textContent = "0%";
+  
+    // Prepara FormData
+    const formData = new FormData();
+    formData.append("file", file);
+  
+    try {
+      const response = await fetch("/upload/to-azure", {
+        method: "POST",
+        body: formData
+      });
+  
+      const data = await response.json();
+  
+      if (response.ok) {
+        progressBar.style.width = "100%";
+        progressBar.textContent = "100%";
+        successMsg.textContent = `Archivo '${data.filename}' subido correctamente`;
+        successMsg.classList.remove("d-none");
+      } else {
+        throw new Error(data.detail || "Error subiendo archivo");
+      }
+  
+    } catch (err) {
+      console.error(err);
+      errorMsg.textContent = err.message || "Error subiendo archivo";
+      errorMsg.classList.remove("d-none");
+    }
+  });
+  </script>  
 
 <script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </body>
