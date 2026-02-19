@@ -62,3 +62,35 @@ class AzureBlobService:
         except Exception as e:
             logger.error(f"❌ Error listando blobs: {e}")
             raise
+
+        # === CREATE/UPDATE (STREAM) ===
+
+    # === CREATE/UPDATE (STREAM) ===
+    def upload_blob_stream(self, container_name, blob_name, file_obj):
+        try:
+            blob_client = self.blob_service_client.get_blob_client(
+                container=container_name,
+                blob=blob_name
+            )
+
+            blob_client.upload_blob(file_obj, overwrite=True)
+
+            logger.info(
+                f"✅ Archivo '{blob_name}' subido por stream al contenedor '{container_name}'."
+            )
+        except Exception as e:
+            logger.error(f"❌ Error subiendo blob por stream: {e}")
+            raise
+    
+    # === LIST CONTAINERS ===
+    def list_containers(self):
+        try:
+            containers = [
+                container.name
+                for container in self.blob_service_client.list_containers()
+            ]
+            logger.info(f"📦 Contenedores disponibles: {containers}")
+            return containers
+        except Exception as e:
+            logger.error(f"❌ Error listando contenedores: {e}")
+            raise

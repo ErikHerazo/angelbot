@@ -18,10 +18,23 @@
     <div class="col-md-6 mx-auto">
 
       <div class="mb-3">
-        <label for="fileInput" class="form-label">select file</label>
+        <label for="fileInput" class="form-label">Select file</label>
         <input class="form-control" type="file" id="fileInput">
       </div>
 
+      <div class="mb-3">
+        <label for="containerSelect" class="form-label">Select container</label>
+        <select class="form-select" id="containerSelect">
+          {% if containers %}
+              {% for container in containers %}
+                  <option value="{{ container }}">{{ container }}</option>
+              {% endfor %}
+          {% else %}
+              <option value="">No containers available</option>
+          {% endif %}
+        </select>        
+      </div>
+      
       <button id="uploadBtn" class="btn btn-primary w-100">Upload file</button>
 
       <!-- Barra de progreso y mensajes -->
@@ -45,6 +58,7 @@
     const progressBar = document.getElementById("progressBar");
     const successMsg = document.getElementById("successMsg");
     const errorMsg = document.getElementById("errorMsg");
+    const container = document.getElementById("containerSelect").value;
   
     successMsg.classList.add("d-none");
     errorMsg.classList.add("d-none");
@@ -62,6 +76,7 @@
     // Prepara FormData
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("container_name", container);
   
     try {
       const response = await fetch("/upload/to-azure", {
