@@ -75,3 +75,8 @@ SUPPORTED_LANGUAGES = {
 }
 
 CONTINUE_TOKEN = "__CONTINUE__"
+
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+WEB_DIR = PROJECT_ROOT / "app" / "web"
