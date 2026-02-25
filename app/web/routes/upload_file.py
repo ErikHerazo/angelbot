@@ -1,6 +1,6 @@
-import os
 import logging
 from app.core import constants
+from app.core.config import Settings
 from dotenv import load_dotenv
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -8,7 +8,6 @@ from fastapi import APIRouter, Request, UploadFile, File
 from app.services.cloud.azure.azure_blob import AzureBlobService
 from fastapi import HTTPException
 from fastapi import Form
-from pathlib import Path
 from app.web.utils import file_validators
 
 
@@ -33,16 +32,20 @@ async def render_home(request: Request):
             "blob_upload.html",
             {
                 "request": request,
-                "containers": containers
+                "containers": containers,
+                "azure_client_id": Settings.AZURE_CLIENT_ID,
+                "azure_tenant_id": Settings.AZURE_TENANT_ID
             }
         )
     except Exception as e:
-        logger.error(f"Error cargando contenedores: {e}")
+        logger.error(f"Error loading containers: {e}")
         return templates.TemplateResponse(
             "blob_upload.html",
             {
                 "request": request,
-                "containers": []
+                "containers": [],
+                "azure_client_id": Settings.AZURE_CLIENT_ID,
+                "azure_tenant_id": Settings.AZURE_TENANT_ID
             }
         )
 
