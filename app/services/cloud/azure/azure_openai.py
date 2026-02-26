@@ -55,24 +55,28 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
     client = get_azure_openai_client()
 
-    lang = "es"
-    
-    if len(user_question.strip()) >= constants.MIN_LANG_DETECTION_LEN and user_question != constants.CONTINUE_TOKEN:
-        result = resolve_language(user_question)
-        if result in constants.SUPPORTED_LANGUAGES:
-            lang=result
-            logger.info(f"🌍 Idioma detectado: {lang}")
-        else:
-            lang=lang
-            logger.info(f"🌍 Idioma cuando no lo detecta: {lang}")
-    else:
-        logger.info(f"🌍 Idioma cuando no entra a la validacion: {lang}")
-
-    # 🧠 Retrieve conversation history from Redis
+    # 🧠 Retrieve conversation history
     history = await session_memory.get_session(session_id)
-    # logger.info(f"📝 History retrieved from Redis: {history}")
-    if not history:
-        history = []
+
+    # 🧠 Retrieve metadata
+    session_data = await session_memory.get_metadata(session_id) or {}
+    current_lang = session_data.get("language")
+
+    # 🌍 Resolve language (solo si no es CONTINUE_TOKEN)
+    if user_question != constants.CONTINUE_TOKEN:
+        lang = resolve_language(
+            user_question,
+            current_session_lang=current_lang
+        )
+    else:
+        # Si es __CONTINUE__, mantener idioma actual
+        lang = current_lang or "es"  # fallback si sesión nueva
+
+    logger.info(f"🌍 Idioma final de sesión: {lang}")
+
+    # 💾 Persist language only if changed
+    if current_lang != lang:
+        await session_memory.update_metadata(session_id, "language", lang)
 
     # Building the initial context
     if channel == "website":
@@ -81,6 +85,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     elif channel == "whatsapp":
         # print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
+    
     system_prompt = (
         f"REGLA DE IDIOMA — PRIORIDAD MÁXIMA:\n"
         f"- Debes responder exclusivamente en el idioma: `{lang}`.\n"
@@ -96,10 +101,15 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     messages.extend(history)
 
-    if user_question is not constants.CONTINUE_TOKEN:
+    if user_question != constants.CONTINUE_TOKEN:
         messages.append({"role": "user", "content": user_question})
 
-    max_toks = constants.OPENAI_MAX_TOKENS if len(user_question) > 200 else int(constants.OPENAI_MAX_TOKENS / 3)
+    question_length = len(user_question) if user_question else 0
+    max_toks = (
+        constants.OPENAI_MAX_TOKENS
+        if question_length > 200
+        else int(constants.OPENAI_MAX_TOKENS / 3)
+    )
 
     async def make_completion(messages, max_toks, force_text=False):
         """
@@ -207,10 +217,17 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         return "⚠️ No se pudo generar una respuesta válida en este momento. Intenta nuevamente."
     clean_content = remove_doc_refs(final_message.content)
     # 💾 Save conversation in Redis (only the last N messages)
-    history.extend([
-        {"role": "user", "content": user_question},
-        {"role": "assistant", "content": clean_content}
-    ])
+    if user_question != constants.CONTINUE_TOKEN:
+        history.extend([
+            {"role": "user", "content": user_question},
+            {"role": "assistant", "content": clean_content}
+        ])
+    else:
+        # Solo guardar la respuesta del assistant
+        history.append({
+            "role": "assistant",
+            "content": clean_content
+        })
 
     # keep only the last N messages
     if len(history) > MAX_HISTORY:
