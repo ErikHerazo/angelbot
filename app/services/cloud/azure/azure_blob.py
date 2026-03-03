@@ -1,3 +1,4 @@
+import re
 import io
 import pandas as pd
 from azure.storage.blob import BlobServiceClient
@@ -11,9 +12,9 @@ class AzureBlobService:
             self.blob_service_client = BlobServiceClient.from_connection_string(
                 settings.AZURE_BLOB_CONNECTION_STRING
             )
-            logger.info("✅ Conexión establecida con Azure Blob Storage.")
+            logger.info("✅ Connection established with Azure Blob Storage.")
         except Exception as e:
-            logger.error(f"❌ Error conectando a Azure Blob Storage: {e}")
+            logger.error(f"❌ Error connecting to Azure Blob Storage: {e}")
             raise
 
     # === READ ===
@@ -63,21 +64,38 @@ class AzureBlobService:
             logger.error(f"❌ Error listando blobs: {e}")
             raise
 
-        # === CREATE/UPDATE (STREAM) ===
-
     # === CREATE/UPDATE (STREAM) ===
-    def upload_blob_stream(self, container_name, blob_name, file_obj):
+    def upload_blob_stream(
+        self,
+        container_name: str,
+        file,
+        prefix: str | None = None
+    ) -> str:
         try:
+            # Basic filename sanitization
+            safe_name = file.filename.strip().replace(" ", "_")
+            safe_name = re.sub(r"[^a-zA-Z0-9_.-]", "", safe_name)
+
+            # Build blob name using prefix if provided
+            if prefix:
+                prefix = prefix if prefix.endswith("/") else f"{prefix}/"
+                blob_name = f"{prefix}{safe_name}"
+            else:
+                blob_name = safe_name
+
             blob_client = self.blob_service_client.get_blob_client(
                 container=container_name,
                 blob=blob_name
             )
 
-            blob_client.upload_blob(file_obj, overwrite=True)
+            blob_client.upload_blob(file.file, overwrite=True)
 
             logger.info(
                 f"✅ Archivo '{blob_name}' subido por stream al contenedor '{container_name}'."
             )
+
+            return blob_name
+
         except Exception as e:
             logger.error(f"❌ Error subiendo blob por stream: {e}")
             raise
@@ -93,4 +111,32 @@ class AzureBlobService:
             return containers
         except Exception as e:
             logger.error(f"❌ Error listando contenedores: {e}")
+            raise
+
+    # === LIST PREFIXES (FOLDERS VIRTUALES) ===
+    def list_prefixes(self, container_name: str, parent_prefix: str | None = None):
+        try:
+            # Validación defensiva
+            if not container_name:
+                raise ValueError("container_name is required")
+            container_client = self.blob_service_client.get_container_client(container_name)
+            
+            prefixes = []
+            
+            blob_iterator = container_client.walk_blobs(
+                name_starts_with=parent_prefix or "",
+                delimiter="/"
+            )
+
+            for item in blob_iterator:
+                if hasattr(item, "prefix"):
+                    prefixes.append(item.prefix)
+
+            logger.info(
+                f"📁 Prefixes in '{container_name}' (parent='{parent_prefix}'): {prefixes}"
+            )
+            return prefixes
+        
+        except Exception as e:
+            logger.error(f"❌ Error listing prefixes: {e}")
             raise

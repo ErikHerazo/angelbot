@@ -37,6 +37,12 @@
             {% endif %}
           </select>
         </div>
+        <div class="mb-3">
+          <label for="prefixSelect" class="form-label">Select folder (optional)</label>
+          <select class="form-select" id="prefixSelect">
+            <option value="">Root</option>
+          </select>
+        </div>
         <button id="loginBtn" class="btn w-100 mb-3" style="background-color:#0078D4; color:white;">
           Login with Microsoft
         </button>
@@ -91,6 +97,42 @@
       } catch (error) {
         console.error(error);
         alert("Login failed");
+      }
+    });
+  </script>
+  <script>
+    const containerSelect = document.getElementById("containerSelect");
+    const prefixSelect = document.getElementById("prefixSelect");
+
+    containerSelect.addEventListener("change", async function () {
+      const container = this.value;
+
+      // Reset the prefix dropdown
+      prefixSelect.innerHTML = '<option value="">Root</option>';
+
+      if (!container) return;
+
+      try {
+        const response = await fetch(
+          `/upload/prefixes?container_name=${encodeURIComponent(container)}`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || "Error loading prefixes");
+        }
+
+        // Populate prefix dropdown
+        data.prefixes.forEach(prefix => {
+          const option = document.createElement("option");
+          option.value = prefix;
+          option.textContent = prefix;
+          prefixSelect.appendChild(option);
+        });
+
+      } catch (error) {
+        console.error("Error fetching prefixes:", error);
       }
     });
   </script>
