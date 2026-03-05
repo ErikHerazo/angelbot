@@ -58,25 +58,14 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     # 🧠 Retrieve conversation history
     history = await session_memory.get_session(session_id)
 
-    # 🧠 Retrieve metadata
-    session_data = await session_memory.get_metadata(session_id) or {}
-    current_lang = session_data.get("language")
-
     # 🌍 Resolve language (solo si no es CONTINUE_TOKEN)
     if user_question != constants.CONTINUE_TOKEN:
-        lang = resolve_language(
-            user_question,
-            current_session_lang=current_lang
-        )
+        lang = resolve_language(user_question)
     else:
         # Si es __CONTINUE__, mantener idioma actual
-        lang = current_lang or "es"  # fallback si sesión nueva
+        lang = "es"
 
     logger.info(f"🌍 Idioma final de sesión: {lang}")
-
-    # 💾 Persist language only if changed
-    if current_lang != lang:
-        await session_memory.update_metadata(session_id, "language", lang)
 
     # Building the initial context
     if channel == "website":
@@ -87,11 +76,10 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         system_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
     
     system_prompt = (
-        f"REGLA DE IDIOMA — PRIORIDAD MÁXIMA:\n"
-        f"- Debes responder exclusivamente en el idioma: `{lang}`.\n"
-        f"- Debes traducir cualquier contenido predefinido o plantilla al idioma indicado.\n"
-        f"- Esta regla anula cualquier otra instrucción previa de idioma.\n"
-        f"- Nunca expliques ni justifiques el idioma utilizado.\n\n"
+        f"REGLA CRITICA DE IDIOMA:\n"
+        f"Debes responder exclusivamente en el idioma: {lang}.\n"
+        f"No utilices otro idioma.\n"
+        f"No expliques el idioma utilizado.\n\n"
         f"{system_prompt}"
     )
 

@@ -57,10 +57,48 @@ async def list_containers():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/prefixes")
+async def get_prefixes(
+    container_name: str,
+    parent_prefix: str | None = None
+):
+    try:
+        # Validate that the container exists in the storage account
+        allowed_containers = azure_service.list_containers()
+
+        if container_name not in allowed_containers:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid container"
+            )
+
+        # Retrieve virtual folder prefixes
+        prefixes = azure_service.list_prefixes(
+            container_name=container_name,
+            parent_prefix=parent_prefix
+        )
+
+        return {
+            "container": container_name,
+            "parent_prefix": parent_prefix,
+            "prefixes": prefixes
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.exception("Error retrieving prefixes")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve prefixes"
+        )
+    
 @router.post("/to-azure")
 async def upload_to_azure(
     file: UploadFile = File(...),
-    container_name: str = Form(...)
+    container_name: str = Form(...),
+    prefix: str = Form(None)
 ):
     try:
         allowed = azure_service.list_containers()
@@ -71,15 +109,13 @@ async def upload_to_azure(
         file_validators.validate_extension(file)
         file_validators.validate_size(file)
 
-        safe_name = file_validators.sanitize_filename(file.filename)
-
-        azure_service.upload_blob_stream(
+        blob_name = azure_service.upload_blob_stream(
             container_name=container_name,
-            blob_name=safe_name,
-            file_obj=file.file
+            file=file,
+            prefix=prefix
         )
 
-        return {"filename": safe_name, "status": "ok"}
+        return {"filename": blob_name, "status": "ok"}
 
     except HTTPException:
         raise
