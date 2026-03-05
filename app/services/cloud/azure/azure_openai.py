@@ -58,10 +58,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     # 🧠 Retrieve conversation history
     history = await session_memory.get_session(session_id)
 
-    # 🧠 Retrieve metadata
-    session_data = await session_memory.get_metadata(session_id) or {}
-    current_lang = session_data.get("language")
-
     # 🌍 Resolve language (solo si no es CONTINUE_TOKEN)
     if user_question != constants.CONTINUE_TOKEN:
         lang = resolve_language(user_question)
@@ -70,10 +66,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         lang = "es"
 
     logger.info(f"🌍 Idioma final de sesión: {lang}")
-
-    # 💾 Persist language only if changed
-    if current_lang != lang:
-        await session_memory.update_metadata(session_id, "language", lang)
 
     # Building the initial context
     if channel == "website":
@@ -85,8 +77,8 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     
     system_prompt = (
         f"REGLA CRITICA DE IDIOMA:\n"
-        f"Responde exclusivamente en el mismo idioma del ÚLTIMO mensaje del usuario.\n"
-        f"Ignora el idioma del historial previo.\n"
+        f"Debes responder exclusivamente en el idioma: {lang}.\n"
+        f"No utilices otro idioma.\n"
         f"No expliques el idioma utilizado.\n\n"
         f"{system_prompt}"
     )
