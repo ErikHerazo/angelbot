@@ -113,3 +113,19 @@ SUPPORTED_LANGUAGES = {
 }
 
 CONTINUE_TOKEN = "__CONTINUE__"
+
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+WEB_DIR = PROJECT_ROOT / "app" / "web"
+
+# File
+ALLOWED_EXTENSIONS={".txt", ".pdf", ".docx", ".png", ".jpg"}
+MAX_FILE_SIZE_MB = 10
+ALLOWED_MIME_TYPES = {
+  "application/pdf",
+  "text/plain",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/png",
+  "image/jpeg",
+}

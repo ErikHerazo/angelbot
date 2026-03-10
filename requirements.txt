@@ -15,3 +15,4 @@ azure-identity==1.20.0
 redis-entraid==1.0.0
 pandas==2.3.3
 fast-langdetect==1.0.0
+Jinja2==3.1.6
