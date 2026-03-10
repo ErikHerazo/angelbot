@@ -104,10 +104,8 @@
     const containerSelect = document.getElementById("containerSelect");
     const prefixSelect = document.getElementById("prefixSelect");
 
-    containerSelect.addEventListener("change", async function () {
-      const container = this.value;
-
-      // Reset the prefix dropdown
+    async function loadPrefixes(container) {
+      // Reset dropdown
       prefixSelect.innerHTML = '<option value="">Root</option>';
 
       if (!container) return;
@@ -123,7 +121,6 @@
           throw new Error(data.detail || "Error loading prefixes");
         }
 
-        // Populate prefix dropdown
         data.prefixes.forEach(prefix => {
           const option = document.createElement("option");
           option.value = prefix;
@@ -134,18 +131,34 @@
       } catch (error) {
         console.error("Error fetching prefixes:", error);
       }
+    }
+
+    // Cuando cambia el contenedor
+    containerSelect.addEventListener("change", function () {
+      const container = this.value;
+      loadPrefixes(container);
+    });
+
+    // 👇 Ejecutar automáticamente al cargar la página
+    window.addEventListener("DOMContentLoaded", () => {
+      if (containerSelect.value) {
+        loadPrefixes(containerSelect.value);
+      }
     });
   </script>
   <script>
     document.getElementById("uploadBtn").addEventListener("click", async () => {
+
       const fileInput = document.getElementById("fileInput");
       const file = fileInput.files[0];
+
+      const container = document.getElementById("containerSelect").value;
+      const prefix = document.getElementById("prefixSelect").value;
 
       const progressContainer = document.getElementById("progressContainer");
       const progressBar = document.getElementById("progressBar");
       const successMsg = document.getElementById("successMsg");
       const errorMsg = document.getElementById("errorMsg");
-      const container = document.getElementById("containerSelect").value;
 
       successMsg.classList.add("d-none");
       errorMsg.classList.add("d-none");
@@ -160,12 +173,18 @@
       progressBar.style.width = "0%";
       progressBar.textContent = "0%";
 
-      // Prepara FormData
+      // FormData
       const formData = new FormData();
       formData.append("file", file);
       formData.append("container_name", container);
 
+      // 👇 enviar prefix
+      if (prefix) {
+        formData.append("prefix", prefix);
+      }
+
       try {
+
         if (!accessToken) {
           errorMsg.textContent = "You must login first";
           errorMsg.classList.remove("d-none");
@@ -185,8 +204,10 @@
         if (response.ok) {
           progressBar.style.width = "100%";
           progressBar.textContent = "100%";
+
           successMsg.textContent = `Archivo '${data.filename}' subido correctamente`;
           successMsg.classList.remove("d-none");
+
         } else {
           throw new Error(data.detail || "Error subiendo archivo");
         }
@@ -196,6 +217,7 @@
         errorMsg.textContent = err.message || "Error subiendo archivo";
         errorMsg.classList.remove("d-none");
       }
+
     });
   </script>
 
