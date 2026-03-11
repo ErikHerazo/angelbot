@@ -9,6 +9,7 @@ from app.services.cloud.azure.azure_blob import AzureBlobService
 from fastapi import HTTPException
 from fastapi import Form
 from app.web.utils import file_validators
+from app.tasks.search_tasks import run_search_indexer
 
 
 router = APIRouter(
@@ -115,7 +116,13 @@ async def upload_to_azure(
             prefix=prefix
         )
 
-        return {"filename": blob_name, "status": "ok"}
+        run_search_indexer.delay()
+
+        return {
+            "filename": blob_name,
+            "status": "ok",
+            "indexer_task": "queued"
+        }
 
     except HTTPException:
         raise

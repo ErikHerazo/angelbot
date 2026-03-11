@@ -15,6 +15,21 @@ services:
       - redis
     restart: unless-stopped
 
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: angelbot/backend:0.1.0
+    container_name: celery-worker
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - redis
+    restart: unless-stopped
+    
   redis:
     image: redis:8.2.2
     container_name: redis
