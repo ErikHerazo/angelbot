@@ -9,9 +9,7 @@ logger = logging.getLogger(__name__)
 class AzureSearchService:
 
     def __init__(self):
-
         self.indexer_name = Settings.AZURE_SEARCH_INDEXER_NAME
-
         self.client = SearchIndexerClient(
             endpoint=Settings.AZURE_SEARCH_ENDPOINT,
             credential=AzureKeyCredential(Settings.AZURE_SEARCH_ADMIN_KEY)
@@ -29,25 +27,20 @@ class AzureSearchService:
 
     def run_indexer(self):
 
-        try:
+        status = self.client.get_indexer_status(self.indexer_name)
 
-            status = self.client.get_indexer_status(self.indexer_name)
+        logger.info(f"Indexer status: {status.status}")
 
-            if status.status.lower() == "running":
+        if status.last_result:
+            logger.info(f"Last_result status: {status.last_result.status}")
+
+            if status.last_result.status == "inProgress":
                 logger.info("Indexer already running")
                 return {"status": "already_running"}
 
-            self.client.run_indexer(self.indexer_name)
+        self.client.run_indexer(self.indexer_name)
 
-            logger.info(f"Indexer {self.indexer_name} started")
+        logger.info(f"Indexer {self.indexer_name} started")
 
-            return {"status": "started"}
-
-        except Exception as e:
-
-            logger.exception("Error running indexer")
-
-            return {
-                "status": "error",
-                "message": str(e)
-            }
+        return {"status": "started"}
+    

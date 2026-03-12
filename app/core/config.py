@@ -19,6 +19,10 @@ class Settings:
     AZURE_SEARCH_ADMIN_KEY = os.getenv("AZURE_AI_SEARCH_API_KEY")
     AZURE_SEARCH_INDEXER_NAME = os.getenv("AZURE_AI_SEARCH_INDEXER")
 
+    # Redis
+    CELERY_BROKER_URL=os.getenv("CELERY_BROKER_URL")
+    CELERY_RESULT_BACKEND=os.getenv("CELERY_RESULT_BACKEND")
+
 settings = Settings()
 
 # 🔐 Validación crítica al arrancar
@@ -36,3 +40,9 @@ if not Settings.AZURE_SEARCH_ADMIN_KEY:
 
 if not Settings.AZURE_SEARCH_INDEXER_NAME:
     raise RuntimeError("AZURE_AI_SEARCH_INDEXER not configured")
+
+if not Settings.CELERY_BROKER_URL:
+    raise RuntimeError("CELERY_BROKER_URL not configured")
+
+if not Settings.CELERY_RESULT_BACKEND:
+    raise RuntimeError("CELERY_RESULT_BACKEND not configured")

@@ -1,12 +1,15 @@
 import logging
 from app.services.cloud.azure.azure_search_service import AzureSearchService
-from app.worker.celery_app import celery_app
+from app.tasks.celery import app
 
 logger = logging.getLogger(__name__)
 
+@app.task
+def add(x, y):
+    return x + y
 
-@celery_app.task
-def run_search_indexer():
+@app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries":3})
+def run_search_indexer(self):
 
     try:
         service = AzureSearchService()
