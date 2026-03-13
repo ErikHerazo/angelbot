@@ -13,6 +13,7 @@ from app.services.cache.session_memory import SessionMemoryRedis
 
 from app.core.utils.language_detector import resolve_language
 from app.core.utils.text_cleaner import remove_doc_refs
+from app.core.utils import rag_validator
 
 
 session_memory = SessionMemoryRedis()
@@ -85,8 +86,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     messages = [{"role": "system", "content": system_prompt}]
 
-    print(f"==================: Prompt despues de agregar la instruccion del lenguaje:\n {messages}")
-
     messages.extend(history)
 
     if user_question != constants.CONTINUE_TOKEN:
@@ -118,16 +117,14 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                         "parameters": {
                             "endpoint": os.environ["AZURE_AI_SEARCH_ENDPOINT"],
                             "index_name": os.environ["AZURE_AI_SEARCH_INDEX"],
-                            "query_type": "vector_semantic_hybrid",
-                            "semantic_configuration": "default",
-                            "fields_mapping": {
-                                "content_fields": ["content"],
-                                "title_field": "title",
-                            },
                             "authentication": {
                                 "type": "api_key",
                                 "key": os.environ["AZURE_AI_SEARCH_API_KEY"],
                             },
+                            "query_type": "vector_semantic_hybrid",
+                            "semantic_configuration": "rag-unstructured-data-semantic-configuration",
+                            "in_scope": True,
+                            "top_n_documents": 5,
                             "embedding_dependency": {
                                 "type": "deployment_name",
                                 "deployment_name": os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
@@ -141,9 +138,10 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     # 🌀 First call with retry
     response = await call_with_retry(make_completion, messages, max_toks)
     response_message = response.choices[0].message
-    logger.info(f"📌 RESPONSE RAW: {response_message}")
 
-    # logger.info("🧠 Initial response received.")
+
+    print(f"============ response: ", response)
+    print(f"============ response messages: ", response_message)
 
     # 🚀 Parallel call control (parallel tool calls)
     if response_message.tool_calls:
@@ -173,6 +171,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                     function_response = azure_tools.procedures_and_treatments_price_list(
                         name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
                     )
+                    print(f"==========🔹 Response from {function_name}:", function_response)
                 else:
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 
@@ -197,13 +196,16 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     # 🚦 Avoid tool call loops: force textual response
     final_response = await call_with_retry(make_completion, messages, max_toks, force_text=True)
     final_message = final_response.choices[0].message
+        
+    _, citations_count = rag_validator.extract_rag_answer(final_response)
+    print("========= Numero de citaciones: ", citations_count)
+    if citations_count==0:
+        logger.warning("⚠️ No se recuperaron documentos, se usará mensaje por defecto.")
+        clean_content = "La informacion solicitada no se encuentra en los documentos de nuestra clinica. "
+    else:
+        # Mantener tu limpieza normal de referencias
+        clean_content = remove_doc_refs(final_message.content)
 
-    # ✅ Validate final response
-    if not final_message.content:
-        logger.warning("⚠️ The model returned content=None. Details:")
-        logger.warning(final_message)
-        return "⚠️ No se pudo generar una respuesta válida en este momento. Intenta nuevamente."
-    clean_content = remove_doc_refs(final_message.content)
     # 💾 Save conversation in Redis (only the last N messages)
     if user_question != constants.CONTINUE_TOKEN:
         history.extend([
@@ -224,5 +226,4 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     await session_memory.connect()
     await session_memory.save_session(session_id, history)
 
-    # logger.info(f"💬 ================ Final answer: {clean_content}")
     return clean_content
