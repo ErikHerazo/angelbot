@@ -160,39 +160,56 @@ def normalize_text(text: str) -> str:
 
 def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
     """
-    Busca coincidencias de procedimientos, tratamientos y cirugías en el archivo de precios almacenado en Azure Blob Storage.
-    La búsqueda es insensible a mayúsculas, acentos, caracteres especiales y soporta:
-      - Coincidencias parciales
-      - Búsqueda por múltiples palabras sin importar el orden.
-    Retorna un string JSON con los resultados y una nota aclaratoria indicando que los precios son referenciales.
+    Searches for matching procedures, treatments, and surgeries in the pricing file stored in Azure Blob Storage.
+    The search is case-insensitive, unaffected by accents or special characters, and supports:
+    - Partial matches
+    - Multi-word searches regardless of order.
+    Returns a JSON string with the results and a note indicating that the prices are for reference only.
     """
-    results = []
+
     query_words = normalize_text(name_surgery_or_treatment).split()
     query_str = " ".join(query_words)
 
     if not query_words:
         return json.dumps({
+            "found": False,
+            "results": [],
             "mensaje": "No se proporcionó un nombre de cirugía o tratamiento válido.",
             "nota": "💡 Los precios del dataset son valores referenciales y pueden variar según el caso clínico."
         })
+    
     price_list_index=os.getenv("AZURE_AI_SEARCH_PRICE_LIST_INDEX")
     azure_ai_search_api_key=os.getenv("AZURE_AI_SEARCH_API_KEY")
+    
     try:
         url = f"https://agb-search.search.windows.net/indexes/{price_list_index}/docs/search?api-version=2025-11-01-preview"
+    
         headers = {
             "Content-Type": "application/json",
             "api-key": azure_ai_search_api_key
         }
+    
         payload = {
             "search": query_str,
             "count": True
         }
+    
         response = requests.post(url, headers=headers, json=payload)
         
         if response.status_code != 200:
             raise Exception(f"Search error: {response.status_code} - {response.text}")
         
         results = response.json()
+        docs = results.get("value", [])
+
+        # ✅ Si no se recuperaron documentos, mensaje por defecto
+        if len(docs) == 0:
+            return json.dumps({
+                "found": False,
+                "results": [],
+                "mensaje": "Lo siento, no encontré esa información en nuestros documentos.",
+                "nota": "💡 Los precios del dataset son referenciales y pueden variar según el caso clínico."
+            })
         
         simplified ={
             "found": True,
@@ -202,11 +219,12 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
                     "price_range": doc.get("price_range_eur", ""),
                     "type_of_currency": "EUR"
                 }
-                for doc in results.get("value", [])
+                for doc in docs
             ],
             "message": "Los precios indicados son aproximados y estan sujetos a cambios tras la valoracion medica especializada. "
         }
         return json.dumps(simplified, indent=2)
+    
     except Exception as e:
         logger.error(f"❌ Error en procedures_and_treatments_price_list: {e}")
         return json.dumps({
