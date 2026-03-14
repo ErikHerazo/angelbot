@@ -88,12 +88,16 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                                 "type": "api_key",
                                 "key": os.environ["AZURE_AI_SEARCH_API_KEY"],
                             },
-                            "query_type": "semantic",
                             "semantic_configuration": "rag-unstructured-data-semantic-configuration",
+                            "fields_mapping": {
+                                "content_fields": ["chunk"],
+                                "title_field": "title"
+                            },
                             "embedding_dependency": {
                                 "type": "deployment_name",
                                 "deployment_name": os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
                             },
+                            "in_scope": True
                         },
                     },
                 ]
@@ -162,14 +166,14 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     final_response = await make_completion(messages, max_toks, force_text=True)
     final_message = final_response.choices[0].message
         
-    _, citations_count = rag_validator.extract_rag_answer(final_response)
-    print("========= Numero de citaciones: ", citations_count)
-    if citations_count==0:
-        logger.warning("⚠️ No se recuperaron documentos, se usará mensaje por defecto.")
-        clean_content = "La informacion solicitada no se encuentra en los documentos de nuestra clinica. "
-    else:
-        # Mantener tu limpieza normal de referencias
-        clean_content = remove_doc_refs(final_message.content)
+    # _, citations_count = rag_validator.extract_rag_answer(final_response)
+    # print("========= Numero de citaciones: ", citations_count)
+    # if not final_message or citations_count==0:
+    #     logger.warning("⚠️ No se recuperaron documentos, se usará mensaje por defecto.")
+    #     clean_content = "La informacion solicitada no se encuentra en los documentos de nuestra clinica. "
+    # else:
+    #     # Mantener tu limpieza normal de referencias
+    clean_content = remove_doc_refs(final_message.content)
 
     # 💾 Save conversation in Redis (only the last N messages)
     if user_question != constants.CONTINUE_TOKEN:

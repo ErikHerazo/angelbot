@@ -207,7 +207,7 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
             return json.dumps({
                 "found": False,
                 "results": [],
-                "mensaje": "Lo siento, no encontré esa información en nuestros documentos.",
+                "mensaje": "Lo siento, ese tratamiento no se realiza en nuestra clínica actualmente.",
                 "nota": "💡 Los precios del dataset son referenciales y pueden variar según el caso clínico."
             })
         
