@@ -1,8 +1,5 @@
 import os
 import json
-import random
-import asyncio
-from azure.core.exceptions import HttpResponseError
 
 from app.core import constants
 from app.core.logging_config import logger
@@ -15,38 +12,8 @@ from app.core.utils.language_detector import resolve_language
 from app.core.utils.text_cleaner import remove_doc_refs
 from app.core.utils import rag_validator
 
-
 session_memory = SessionMemoryRedis()
 MAX_HISTORY = 6
-
-async def call_with_retry(func, *args, **kwargs):
-    """
-    Wrapper with retry/backoff + jitter to handle 429 or 503 errors.
-    """
-    for attempt in range(1, constants.OPENAI_MAX_RETRIES + 1):
-        try:
-            return await func(*args, **kwargs)
-
-        except HttpResponseError as e:
-            status = getattr(e.response, "status_code", None)
-            retry_after = None
-
-            if hasattr(e, "response") and hasattr(e.response, "headers"):
-                retry_after = e.response.headers.get("retry-after")
-
-            if status in [429, 503]:
-                delay = float(retry_after) if retry_after else (1.0 * (2 ** (attempt - 1)) + random.uniform(0, 0.5))
-                logger.warning(f"⚠️ Rate limit ({status}) detectado. Reintento {attempt}/{constants.OPENAI_MAX_RETRIES} en {delay:.2f}s...")
-                await asyncio.sleep(delay)
-            else:
-                logger.error(f"❌ Error HTTP inesperado ({status}): {e}")
-                raise e
-
-        except Exception as e:
-            logger.exception(f"💥 Excepción inesperada en intento {attempt}: {e}")
-            await asyncio.sleep(1.0 * (2 ** (attempt - 1)))
-
-    raise Exception("🚫 Maximum number of retries exceeded with Azure OpenAI.")
 
 async def run_conversation_with_rag(session_id: str, user_question: str, channel: str="website"):
     """
@@ -70,10 +37,10 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     # Building the initial context
     if channel == "website":
-        # print(f"============ CHANNEL: {channel}")
+        print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
     elif channel == "whatsapp":
-        # print(f"============ CHANNEL: {channel}")
+        print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
     
     system_prompt = (
@@ -97,7 +64,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         if question_length > 200
         else int(constants.OPENAI_MAX_TOKENS / 3)
     )
-
+    print(f"========= ultimo paso antes de llamar a make_completions")
     async def make_completion(messages, max_toks, force_text=False):
         """
         Make a call to Azure OpenAI ChatCompletion.
@@ -121,10 +88,8 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                                 "type": "api_key",
                                 "key": os.environ["AZURE_AI_SEARCH_API_KEY"],
                             },
-                            "query_type": "vector_semantic_hybrid",
+                            "query_type": "semantic",
                             "semantic_configuration": "rag-unstructured-data-semantic-configuration",
-                            "in_scope": True,
-                            "top_n_documents": 5,
                             "embedding_dependency": {
                                 "type": "deployment_name",
                                 "deployment_name": os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
@@ -136,7 +101,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         )
 
     # 🌀 First call with retry
-    response = await call_with_retry(make_completion, messages, max_toks)
+    response = await make_completion(messages, max_toks)
     response_message = response.choices[0].message
 
 
@@ -194,7 +159,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         })
 
     # 🚦 Avoid tool call loops: force textual response
-    final_response = await call_with_retry(make_completion, messages, max_toks, force_text=True)
+    final_response = await make_completion(messages, max_toks, force_text=True)
     final_message = final_response.choices[0].message
         
     _, citations_count = rag_validator.extract_rag_answer(final_response)
