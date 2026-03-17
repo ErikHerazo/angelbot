@@ -10,7 +10,7 @@ from app.services.cache.session_memory import SessionMemoryRedis
 
 from app.core.utils.language_detector import resolve_language
 from app.core.utils.text_cleaner import remove_doc_refs
-from app.core.utils import rag_validator
+
 
 session_memory = SessionMemoryRedis()
 MAX_HISTORY = 6
@@ -26,15 +26,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     # 🧠 Retrieve conversation history
     history = await session_memory.get_session(session_id)
 
-    # 🌍 Resolve language (solo si no es CONTINUE_TOKEN)
-    if user_question != constants.CONTINUE_TOKEN:
-        lang = resolve_language(user_question)
-    else:
-        # Si es __CONTINUE__, mantener idioma actual
-        lang = "es"
-
-    logger.info(f"🌍 Idioma final de sesión: {lang}")
-
     # Building the initial context
     if channel == "website":
         print(f"============ CHANNEL: {channel}")
@@ -42,14 +33,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     elif channel == "whatsapp":
         print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
-    
-    system_prompt = (
-        f"REGLA CRITICA DE IDIOMA:\n"
-        f"Debes responder exclusivamente en el idioma: {lang}.\n"
-        f"No utilices otro idioma.\n"
-        f"No expliques el idioma utilizado.\n\n"
-        f"{system_prompt}"
-    )
 
     messages = [{"role": "system", "content": system_prompt}]
 
@@ -166,13 +149,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     final_response = await make_completion(messages, max_toks, force_text=True)
     final_message = final_response.choices[0].message
         
-    # _, citations_count = rag_validator.extract_rag_answer(final_response)
-    # print("========= Numero de citaciones: ", citations_count)
-    # if not final_message or citations_count==0:
-    #     logger.warning("⚠️ No se recuperaron documentos, se usará mensaje por defecto.")
-    #     clean_content = "La informacion solicitada no se encuentra en los documentos de nuestra clinica. "
-    # else:
-    #     # Mantener tu limpieza normal de referencias
     clean_content = remove_doc_refs(final_message.content)
 
     # 💾 Save conversation in Redis (only the last N messages)
