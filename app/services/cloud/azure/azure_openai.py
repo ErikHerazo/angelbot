@@ -47,7 +47,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         if question_length > 200
         else int(constants.OPENAI_MAX_TOKENS / 3)
     )
-    print(f"========= ultimo paso antes de llamar a make_completions")
     async def make_completion(messages, max_toks, force_text=False):
         """
         Make a call to Azure OpenAI ChatCompletion.
@@ -71,7 +70,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                                 "type": "api_key",
                                 "key": os.environ["AZURE_AI_SEARCH_API_KEY"],
                             },
-                            "semantic_configuration": "rag-unstructured-data-semantic-configuration",
+                            "semantic_configuration": os.environ["SEMANTIC_CONFIGURATION"],
                             "fields_mapping": {
                                 "content_fields": ["chunk"],
                                 "title_field": "title"
@@ -91,9 +90,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     response = await make_completion(messages, max_toks)
     response_message = response.choices[0].message
 
-
-    print(f"============ response: ", response)
-    print(f"============ response messages: ", response_message)
+    print(f"============ Respuesta inicial: ", response_message)
 
     # 🚀 Parallel call control (parallel tool calls)
     if response_message.tool_calls:
@@ -123,7 +120,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                     function_response = azure_tools.procedures_and_treatments_price_list(
                         name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
                     )
-                    print(f"==========🔹 Response from {function_name}:", function_response)
+                    print(f"==========🔹 Respuesta de listado de precios:", function_response)
                 else:
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 
