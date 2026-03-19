@@ -33,6 +33,9 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     elif channel == "whatsapp":
         print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
+    elif channel == "instagram":
+        print(f"============ CHANNEL: {channel}")
+        system_prompt = constants.INSTAGRAM_ASSISTANT_PROMPT.strip()
 
     messages = [{"role": "system", "content": system_prompt}]
 
