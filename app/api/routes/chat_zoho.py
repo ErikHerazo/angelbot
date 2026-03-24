@@ -59,3 +59,11 @@ async def zoho_bot_webhook(request: Request):
         )
         raise HTTPException(status_code=500, detail=str(e))
     
+@router.post("/form-response", include_in_schema=False)
+async def form_response(request: Request):
+    data = await request.json()
+    print("=== Informacion recibida del Formulario: ===\n", data)
+    return {
+        "status": True,
+        "message": "Pregunta recibida satisfactoriamente..."
+    }
