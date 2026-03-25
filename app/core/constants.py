@@ -179,12 +179,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 WEB_DIR = PROJECT_ROOT / "app" / "web"
 
 # File
-ALLOWED_EXTENSIONS={".txt", ".pdf", ".docx", ".png", ".jpg"}
+ALLOWED_EXTENSIONS={".txt", ".pdf", ".docx", ".png", ".jpg", ".csv", ".xlsx"}
 MAX_FILE_SIZE_MB = 10
-ALLOWED_MIME_TYPES = {
-  "application/pdf",
-  "text/plain",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "image/png",
-  "image/jpeg",
+ALLOWED_MIME_TYPES = {    
+      "application/pdf",
+      "text/plain",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "image/png",
+      "image/jpeg",
+      "text/csv",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 }
