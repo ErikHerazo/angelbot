@@ -66,3 +66,7 @@ Dockerfile.dev
 
 # Archivos de checkpoints de notebooks
 .ipynb_checkpoints/
+
+# Ngrok
+ngrok.yml
+.ngrok2/

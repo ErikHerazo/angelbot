@@ -8,3 +8,4 @@ tunnels:
   basic:
     proto: http
     addr: app:8000
+    domain: modest-trout-locally.ngrok-free.app
