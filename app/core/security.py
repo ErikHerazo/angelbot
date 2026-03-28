@@ -1,4 +1,5 @@
 import os
+import hmac
 import base64
 import logging
 import binascii
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 API_KEY = os.getenv("UPLOAD_API_KEY")
 API_KEY_OPENAI = os.getenv("AZURE_OPENAI_API_KEY_MAIN")
+EXPECTED_SECRET = os.getenv("FLOW_WEBHOOK_SECRET")
 
 _PUBLIC_KEY = None
 _PUBLIC_KEY_LOCK = Lock()
@@ -76,24 +78,34 @@ def check_zoho_rsa_signature(signature: str, payload: bytes) -> bool:
         return False
 
 async def validate_zoho_webhook(request: Request) -> bytes:
+    body_bytes = await request.body()
+    
     signature_b64 = request.headers.get("x-siqsignature")
+    secret = request.headers.get("x-webhook-secret")
 
-    if not signature_b64:
+    if signature_b64:
+        if not check_zoho_rsa_signature(signature_b64, body_bytes):
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid signature"
+            )
+        logger.info("✅ Zoho webhook RSA signature VALIDATED successfully")
+    
+    elif secret:
+        if not hmac.compare_digest(secret, EXPECTED_SECRET):
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid webhook secret"
+            )
+        
+    else:
         raise HTTPException(
             status_code=400,
-            detail="Missing header x-siqsignature"
+            detail="Missing authentication headers"
         )
 
-    body_bytes = await request.body()
-    logger.info("x-siqsignature present=%s", bool(signature_b64))
-    logger.info("x-siqsignature raw=%s", signature_b64)
-    if not check_zoho_rsa_signature(signature_b64, body_bytes):
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid signature"
-        )
-    
-    logger.info("✅ Zoho webhook RSA signature VALIDATED successfully")
+    # logger.info("x-siqsignature present=%s", bool(signature_b64))
+    # logger.info("x-siqsignature raw=%s", signature_b64)
 
     # ✅ REINYECTAR el body para que request.json() funcione
     async def receive():
