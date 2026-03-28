@@ -34,6 +34,7 @@ async def webhook_get():
 async def zoho_bot_webhook(request: Request):
     # Validates RSA signature and caches the body
     await security.validate_zoho_webhook(request)
+    print("✅ Zoho webhook authentication PASSED")
 
     body = await request.json()
     print("=== BODY ===:\n", body)
