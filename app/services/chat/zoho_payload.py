@@ -11,7 +11,7 @@ class ZohoMessage:
     channel: str
     raw: dict
 
-def parse_zoho_payload(body: dict) -> ZohoMessage:
+def parse_zoho_sales_payload(body: dict) -> ZohoMessage:
     handler = body.get("handler")
     message = body.get("message") or {}
     visitor = body.get("visitor") or {}
@@ -38,3 +38,4 @@ def parse_zoho_payload(body: dict) -> ZohoMessage:
         channel=channel,
         raw=body,
     )
+

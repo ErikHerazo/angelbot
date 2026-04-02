@@ -77,41 +77,42 @@ def check_zoho_rsa_signature(signature: str, payload: bytes) -> bool:
         logger.exception("Unexpected error verifying Zoho RSA signature")
         return False
 
-async def validate_zoho_webhook(request: Request) -> bytes:
-    body_bytes = await request.body()
+async def validate_zoho_sales_webhook(request: Request) -> bytes:
+    body = await request.body()
     
     signature_b64 = request.headers.get("x-siqsignature")
-    secret = request.headers.get("x-webhook-secret")
 
     if signature_b64:
-        if not check_zoho_rsa_signature(signature_b64, body_bytes):
+        if not check_zoho_rsa_signature(signature_b64, body):
             raise HTTPException(
                 status_code=403,
                 detail="Invalid signature"
             )
         logger.info("✅ Zoho webhook RSA signature VALIDATED successfully")
-    
-    elif secret:
-        if not hmac.compare_digest(secret, EXPECTED_SECRET):
-            raise HTTPException(
-                status_code=403,
-                detail="Invalid webhook secret"
-            )
-        
     else:
         raise HTTPException(
             status_code=400,
             detail="Missing authentication headers"
         )
-
-    # logger.info("x-siqsignature present=%s", bool(signature_b64))
-    # logger.info("x-siqsignature raw=%s", signature_b64)
-
     # ✅ REINYECTAR el body para que request.json() funcione
     async def receive():
-        return {"type": "http.request", "body": body_bytes}
-
+        return {"type": "http.request", "body": body}
     request._receive = receive
+    # logger.info("Zoho webhook signature validated")
+    return body
 
-    logger.info("Zoho webhook signature validated")
-    return body_bytes
+async def validate_zoho_flow_webhook(request: Request):
+    secret = request.headers.get("x-webhook-secret")
+
+    if not secret:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing authentication headers"
+        )
+
+    if not hmac.compare_digest(secret, EXPECTED_SECRET):
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid webhook secret"
+        )
+    

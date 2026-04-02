@@ -24,7 +24,10 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     client = get_azure_openai_client()
 
     # 🧠 Retrieve conversation history
-    history = await session_memory.get_session(session_id)
+    if channel == "flow":
+        history=[]
+    else:
+        history = await session_memory.get_session(session_id)
 
     # Building the initial context
     if channel == "website":
@@ -36,6 +39,12 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     elif channel == "instagram":
         print(f"============ CHANNEL: {channel}")
         system_prompt = constants.INSTAGRAM_ASSISTANT_PROMPT.strip()
+    elif channel == "flow":
+        print(f"============ CHANNEL: {channel}")
+        system_prompt = constants.FLOW_FORM_ASSISTANT_PROMPT.strip()
+    else:
+        print(f"============ CHANNEL: {channel}")
+        system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
 
     messages = [{"role": "system", "content": system_prompt}]
 
@@ -123,7 +132,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                     function_response = azure_tools.procedures_and_treatments_price_list(
                         name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
                     )
-                    print(f"==========🔹 Respuesta de listado de precios:", function_response)
+                    # print(f"==========🔹 Respuesta de listado de precios:", function_response)
                 else:
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 
@@ -139,7 +148,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
             })
 
     else:
-        logger.info("ℹ️ No tool calls were detected in the initial response.")
+        # logger.info("ℹ️ No tool calls were detected in the initial response.")
         messages.append({
             "role": response_message.role,
             "content": response_message.content or "",
@@ -150,25 +159,26 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     final_message = final_response.choices[0].message
         
     clean_content = remove_doc_refs(final_message.content)
+    if channel != "flow":
+        # 💾 Save conversation in Redis (only the last N messages)
+        if user_question != constants.CONTINUE_TOKEN:
+            history.extend([
+                {"role": "user", "content": user_question},
+                {"role": "assistant", "content": clean_content}
+            ])
+        else:
+            # Solo guardar la respuesta del assistant
+            history.append({
+                "role": "assistant",
+                "content": clean_content
+            })
 
-    # 💾 Save conversation in Redis (only the last N messages)
-    if user_question != constants.CONTINUE_TOKEN:
-        history.extend([
-            {"role": "user", "content": user_question},
-            {"role": "assistant", "content": clean_content}
-        ])
-    else:
-        # Solo guardar la respuesta del assistant
-        history.append({
-            "role": "assistant",
-            "content": clean_content
-        })
+        # keep only the last N messages
+        if len(history) > MAX_HISTORY:
+            history = history[-MAX_HISTORY:]
 
-    # keep only the last N messages
-    if len(history) > MAX_HISTORY:
-        history = history[-MAX_HISTORY:]
-
-    await session_memory.connect()
-    await session_memory.save_session(session_id, history)
+        await session_memory.connect()
+        await session_memory.save_session(session_id, history)
 
     return clean_content
+    

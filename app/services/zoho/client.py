@@ -42,9 +42,6 @@ class ZohoClient:
                 detail=f"Zoho API error {resp.status_code}: {resp.text}"
             )
 
-    # ---------------------------------------------------------------------
-    # ✔️ function to send the final response via API callback/response
-    # ---------------------------------------------------------------------
     async def send_progress_update(self, request_id: str):
         """Send a 'progress' message to extend Zoho's timeout."""
 

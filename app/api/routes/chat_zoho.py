@@ -1,12 +1,8 @@
 import logging
-
 from fastapi.responses import HTMLResponse, Response
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request
+from app.services.chat.zoho_dispatcher import dispatch_zoho_webhook
 
-from app.core import security
-from app.services.chat.zoho_payload import parse_zoho_payload
-from app.services.chat.handlers.trigger_handler import handle_trigger
-from app.services.chat.handlers.message_handler import handle_message
 
 router = APIRouter()
 
@@ -32,39 +28,6 @@ async def webhook_get():
 # --- MAIN ENDPOINT ---
 @router.post("/webhook")
 async def zoho_bot_webhook(request: Request):
-    # Validates RSA signature and caches the body
-    await security.validate_zoho_webhook(request)
-    print("✅ Zoho webhook authentication PASSED")
-
-    body = await request.json()
-    print("=== BODY ===:\n", body)
-    zoho_message = parse_zoho_payload(body=body)
-
-    logger.info(
-        "Zoho webhook received",
-        extra={
-            "handler": zoho_message.handler,
-            "request_id": zoho_message.request_id,
-        },
-    )
-    try:
-        if zoho_message.handler == "trigger":
-            return handle_trigger()
-        
-        if zoho_message.handler == "message":
-            return handle_message(zoho_message=zoho_message)
-    except Exception as e:
-        logger.exception(
-            "Zoho webhook failed",
-            extra={"request_id": zoho_message.request_id},
-        )
-        raise HTTPException(status_code=500, detail=str(e))
-    
-@router.post("/form-response", include_in_schema=False)
-async def form_response(request: Request):
-    data = await request.json()
-    print("=== Informacion recibida del Formulario: ===\n", data)
-    return {
-        "status": True,
-        "message": "Pregunta recibida satisfactoriamente..."
-    }
+    print("=== Headers ===\n", dict(request.headers))
+    print("=== Body ===\n", await request.body())
+    return await dispatch_zoho_webhook(request)
