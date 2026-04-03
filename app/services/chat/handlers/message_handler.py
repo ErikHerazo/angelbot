@@ -3,30 +3,33 @@ import logging
 import uuid
 
 from app.core import constants
-from app.services.chat.zoho_payload import ZohoMessage
-from app.services.chat.zoho_processor import process_message_async
+from app.services.chat.models.event import ChatEvent
+from app.services.chat.zoho_message_processor import process_message_async
+
 
 logger = logging.getLogger(__name__)
 
-def handle_message(zoho_message: ZohoMessage):
-    session_id = zoho_message.session_id or str(uuid.uuid4())
 
-    logger.info(
-        "Message webhook received",
-        extra={
-            "handler": zoho_message.handler,
-            "session_id": session_id,
-            "has_question": bool(zoho_message.user_question),
-        },
-    )
+def handle_message(event: ChatEvent):
+    session_id = event.session_id or str(uuid.uuid4())
 
-    # ✔️ Execute asynchronous task after return
+    # logger.info(
+    #     "Message webhook received",
+    #     extra={
+    #         "source": event.source,
+    #         "event_type": event.event_type,
+    #         "session_id": session_id,
+    #         "has_question": bool(event.message),
+    #     },
+    # )
+
     asyncio.create_task(
         process_message_async(
-            request_id=zoho_message.request_id,
+            request_id=event.request_id,
             session_id=session_id,
-            user_question=zoho_message.user_question,
-            channel=zoho_message.channel
+            user_question=event.message,
+            channel=event.metadata.get("channel"),
         )
     )
+
     return constants.PENDING_PAYLOAD

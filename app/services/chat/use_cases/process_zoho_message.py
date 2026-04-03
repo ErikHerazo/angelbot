@@ -16,14 +16,14 @@ async def process_zoho_message(
     channel: str,
     rag_runner,
 ):
-    logger.info(
-        "Processing Zoho message",
-        extra={
-            "request_id": request_id,
-            "session_id": session_id,
-            "channel": channel,
-        },
-    )
+    # logger.info(
+    #     "Processing Zoho message",
+    #     extra={
+    #         "request_id": request_id,
+    #         "session_id": session_id,
+    #         "channel": channel,
+    #     },
+    # )
 
     # 1) Send progress
     await zoho_client.send_progress_update(request_id=request_id)
