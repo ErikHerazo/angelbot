@@ -11,7 +11,7 @@ async def process_zoho_flow_lead(
     rag_runner=None,
 ):
     if rag_runner is None:
-        from app.services.chat.rag.run_conversation import run_conversation_with_rag
+        from app.services.cloud.azure.azure_openai import run_conversation_with_rag
         rag_runner = run_conversation_with_rag
     try:
         # 1. Extraer campos
@@ -20,31 +20,44 @@ async def process_zoho_flow_lead(
         lang = lead_data.get("lang", "es")
 
         motivo = lead_data.get("motivo_de_la_cita")
-        interes = lead_data.get("interes_formulario")
+        interest = lead_data.get("interes_formulario")
 
         # 2. Intent principal
-        intent_parts = [motivo, interes]
+        intent_parts = [motivo, interest]
         intent = " | ".join(filter(None, intent_parts))
 
         if not intent:
             return {
-                "status": "error",
-                "message": "No intent was found in the form"
+                "success": False,
+                "response": None,
+                "intent": None,
+                "entities": {
+                    "first_name": first_name,
+                    "last_name": last_name
+                },
+                "meta": {
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "source": "zoho_flow"
+                },
+                "error": {
+                    "code": "NO_INTENT",
+                    "message": "No intent was found in the form"
+                }
             }
         
-        logger.info(
-            "Processing Zoho Flow lead",
-            extra={
-                "request_id": request_id,
-                "session_id": session_id,
-                "intent": intent,
-            },
-        )
+        # logger.info(
+        #     "Processing Zoho Flow lead",
+        #     extra={
+        #         "request_id": request_id,
+        #         "session_id": session_id,
+        #         "intent": intent,
+        #     },
+        # )
 
         # 3. SOLO contexto, no instrucciones
         user_question = (
             f"Motivo de consulta del paciente: {intent}. "
-            f"Nombre del paciente: {first_name} {last_name}. "
             f"Idioma: {lang}."
         )
 
@@ -57,10 +70,23 @@ async def process_zoho_flow_lead(
 
         # 5. Retornar a Zoho Flow
         return {
-            "status": "success",
+            "success": True,
             "response": answer,
-            "first_name": first_name,
-            "last_name": last_name,
+            "intent": {
+                "reason": motivo,
+                "interest": interest
+            },
+            "entities":{
+                "first_name": first_name,
+                "last_name": last_name,
+                "lang": lang
+            },
+            "meta": {
+                "request_id": request_id,
+                "session_id": session_id,
+                "source": "flow"
+            },
+            "error": None
         }
 
     except Exception:
@@ -70,7 +96,18 @@ async def process_zoho_flow_lead(
         )
 
         return {
-            "status": "error",
-            "response": "An error occurred while processing the request."
+            "success": False,
+            "response": None,
+            "intent": None,
+            "entities": {},
+            "meta": {
+                "request_id": request_id,
+                "session_id": session_id,
+                "source": "zoho_flow"
+            },
+            "error": {
+                "code": "PROCESSING_ERROR",
+                "message": "An error occurred while processing the request."
+            }
         }
     

@@ -7,14 +7,14 @@ from app.services.chat.handlers.flow_handler import handle_flow_lead
 
 async def route_chat_event(event: ChatEvent):
     try:
-        # Eventos de chat (SalesIQ)
+        # Chat evnets (SalesIQ)
         if event.event_type == "message":
             return handle_message(event)
 
         if event.event_type == "trigger":
             return handle_trigger()
 
-        # Eventos de formularios (Zoho Flow)
+        # Form events (Zoho Flow)
         if event.event_type == "lead":
             return await handle_flow_lead(event)
 

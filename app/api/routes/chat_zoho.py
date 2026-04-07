@@ -28,6 +28,6 @@ async def webhook_get():
 # --- MAIN ENDPOINT ---
 @router.post("/webhook")
 async def zoho_bot_webhook(request: Request):
-    print("=== Headers ===\n", dict(request.headers))
-    print("=== Body ===\n", await request.body())
+    # print("=== Headers ===\n", dict(request.headers))
+    # print("=== Body ===\n", await request.body())
     return await dispatch_zoho_webhook(request)

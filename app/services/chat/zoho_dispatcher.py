@@ -11,7 +11,6 @@ from app.services.chat.chat_event_router import route_chat_event
 
 
 async def dispatch_zoho_webhook(request: Request):
-    print("=== entrando en dispatch ===")
     try:
         headers = request.headers
         body_bytes = await request.body()
