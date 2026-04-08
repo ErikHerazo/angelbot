@@ -8,7 +8,7 @@ from app.services.cloud.azure import azure_tools
 from app.services.cloud.azure.client import get_azure_openai_client
 from app.services.cache.session_memory import SessionMemoryRedis
 
-from app.core.utils.language_detector import resolve_language
+from app.core.utils.language_detector import detect_language
 from app.core.utils.text_cleaner import remove_doc_refs
 
 
@@ -46,6 +46,12 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
 
+    lang = detect_language(user_question)
+    
+    if lang is None:
+        system_prompt += "\n'Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán.'"
+    system_prompt += f"\nDebes responder ÚNICAMENTE en el idioma {lang}."
+    
     messages = [{"role": "system", "content": system_prompt}]
 
     messages.extend(history)

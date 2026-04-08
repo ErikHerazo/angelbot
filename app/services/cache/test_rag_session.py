@@ -1,6 +1,7 @@
 import asyncio
 from app.services.cloud.azure.azure_openai import run_conversation_with_rag
 
+
 async def main():
     session_id = "test-session-001"
     user_question = "Hola, ¿quién eres?"
