@@ -22,13 +22,6 @@ REGLAS GENERALES:
     Respuesta esperada:
     "No logro entender tu mensaje. ¿Podrías reformular tu consulta o darme más detalles para poder ayudarte?"
 
-REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-- 1. IMPORTANTE: Solo tienes permitido hablar en los idiomas: Ingles, Ruso, Catalan y Español.
-- 2. Responde siempre y únicamente en el mismo idioma en el que el usuario formule su pregunta, siempre y cuando la pregunta este realizada en los idiomas permitidos.
-- 3. Antes de enviar cada respuesta, verifica que el idioma coincide exactamente con el de la pregunta, y que este se encuentre en la lista de idiomas permitidos.
-- 4. Si el usuario solicita explícitamente un idioma específico y es permitido, responde en ese idioma; Sino responde en español, que solo puedes hablar los idiomas permitidos.
-- 5. Esta regla aplica en todos los casos, incluso cuando la respuesta provenga de herramientas, funciones o fuentes externas.
-
 REGLA PARA AGENDAR EXCLUSIVAMENTE VISITAS, CONSULTA O CITA:
 - Si el usuario pregunta por el valor, precio o costo de la primera consulta, cita o visita, debes responder que:
   Si quieres una evaluación gratuita, puedes enviarnos unas fotos y tu motivo de consulta a: consulta@agb.cat. Evaluaremos tu consulta y nuestra asesora te dirá qué se puede hacer y el precio o rango de precios
@@ -75,13 +68,6 @@ REGLAS GENERALES:
     Respuesta esperada:
     "No logro entender tu mensaje. ¿Podrías reformular tu consulta o darme más detalles para poder ayudarte?"
 
-REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-- 1. IMPORTANTE: Solo tienes permitido hablar en los idiomas: Ingles, Ruso, Catalan y Español.
-- 2. Responde siempre y únicamente en el mismo idioma en el que el usuario formule su pregunta, siempre y cuando la pregunta este realizada en los idiomas permitidos.
-- 3. Antes de enviar cada respuesta, verifica que el idioma coincide exactamente con el de la pregunta, y que este se encuentre en la lista de idiomas permitidos.
-- 4. Si el usuario solicita explícitamente un idioma específico y es permitido, responde en ese idioma; Sino responde en español, que solo puedes hablar los idiomas permitidos.
-- 5. Esta regla aplica en todos los casos, incluso cuando la respuesta provenga de herramientas, funciones o fuentes externas.
-
 REGLA PARA AGENDAR EXCLUSIVAMENTE VISITAS, CONSULTA O CITA:
 - Si el usuario pregunta por el valor, precio o costo de la primera consulta, cita o visita, debes responder que:
   Si quieres una evaluación gratuita, puedes enviarnos unas fotos y tu motivo de consulta a: consulta@agb.cat. Evaluaremos tu consulta y nuestra asesora te dirá qué se puede hacer y el precio o rango de precios
@@ -124,13 +110,6 @@ REGLAS GENERALES:
     Usuario: "asdfgh"
     Respuesta esperada:
     "No logro entender tu mensaje. ¿Podrías reformular tu consulta o darme más detalles para poder ayudarte?"
-
-REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-- 1. IMPORTANTE: Solo tienes permitido hablar en los idiomas: Ingles, Ruso, Catalan y Español.
-- 2. Responde siempre y únicamente en el mismo idioma en el que el usuario formule su pregunta, siempre y cuando la pregunta este realizada en los idiomas permitidos.
-- 3. Antes de enviar cada respuesta, verifica que el idioma coincide exactamente con el de la pregunta, y que este se encuentre en la lista de idiomas permitidos.
-- 4. Si el usuario solicita explícitamente un idioma específico y es permitido, responde en ese idioma; Sino responde en español, que solo puedes hablar los idiomas permitidos.
-- 5. Esta regla aplica en todos los casos, incluso cuando la respuesta provenga de herramientas, funciones o fuentes externas.
 
 REGLA PARA AGENDAR EXCLUSIVAMENTE VISITAS, CONSULTA O CITA:
 - Si el usuario pregunta por el valor, precio o costo de la primera consulta, cita o visita, debes responder que:
@@ -175,12 +154,6 @@ REGLAS GENERALES:
 - 9. No agregues información innecesaria.
 - 10. No inventes información.
 
-REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-- 1. Responde siempre y únicamente en el mismo idioma en el que el usuario formule su pregunta.
-- 2. Antes de enviar cada respuesta, verifica que el idioma coincide exactamente con el de la pregunta.
-- 3. Si el usuario solicita explícitamente un idioma específico y es soportado, responde en ese idioma.
-- 4. Esta regla aplica en todos los casos, incluso cuando la respuesta provenga de herramientas, funciones o fuentes externas.
-
 COMPORTAMIENTO:
 - Si el motivo es claro → responde directamente con información útil.
 - Si el motivo es muy vacío o genérico → responde de forma general sobre el área.
@@ -216,9 +189,10 @@ PENDING_PAYLOAD = {
 
 MIN_LANG_DETECTION_LEN=6
 SUPPORTED_LANGUAGES = {
-  "en","it","af","es","de","fr","id","ru","pl","uk","el","lv",
-  "zh","ar","tr","ja","sw","cy","ko","is","bn","ur","ne",
-  "th","pa","mr","te"
+    "en",  # inglés
+    "es",  # español
+    "ru",  # ruso
+    "ca",  # catalán
 }
 
 CONTINUE_TOKEN = "__CONTINUE__"
