@@ -47,11 +47,23 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
 
     lang = detect_language(user_question)
-    
+
     if lang is None:
-        system_prompt += "\n'Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán.'"
-    system_prompt += f"\nDebes responder ÚNICAMENTE en el idioma {lang}."
-    
+        system_prompt += (
+            "\nINSTRUCCIÓN CRÍTICA:\n"
+            "NO debes responder la pregunta del usuario.\n"
+            "NO debes dar explicaciones.\n"
+            "NO debes agregar texto adicional.\n"
+            "DEBES responder ÚNICAMENTE con el siguiente mensaje exacto:\n"
+            "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
+        )
+    else:
+        system_prompt += (
+            f"\nINSTRUCCIÓN CRÍTICA:\n"
+            f"Debes responder ÚNICAMENTE en el idioma: {lang}.\n"
+            "No cambies de idioma bajo ninguna circunstancia."
+        )
+
     messages = [{"role": "system", "content": system_prompt}]
 
     messages.extend(history)
