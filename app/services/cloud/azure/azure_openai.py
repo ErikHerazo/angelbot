@@ -29,6 +29,11 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     else:
         history = await session_memory.get_session(session_id)
 
+    lang = detect_language(user_question)
+
+    if lang is None:
+        return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
+
     # Building the initial context
     if channel == "website":
         print(f"============ CHANNEL: {channel}")
@@ -45,24 +50,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     else:
         print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
-
-    lang = detect_language(user_question)
-
-    if lang is None:
-        system_prompt += (
-            "\nINSTRUCCIÓN CRÍTICA:\n"
-            "NO debes responder la pregunta del usuario.\n"
-            "NO debes dar explicaciones.\n"
-            "NO debes agregar texto adicional.\n"
-            "DEBES responder ÚNICAMENTE con el siguiente mensaje exacto:\n"
-            "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
-        )
-    else:
-        system_prompt += (
-            f"\nINSTRUCCIÓN CRÍTICA:\n"
-            f"Debes responder ÚNICAMENTE en el idioma: {lang}.\n"
-            "No cambies de idioma bajo ninguna circunstancia."
-        )
 
     messages = [{"role": "system", "content": system_prompt}]
 
@@ -124,7 +111,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     # 🚀 Parallel call control (parallel tool calls)
     if response_message.tool_calls:
-        # print("============= HAY LLAMADO DE FUNCIONES ============================")
+        print("============= LLAMANDO DE FUNCIONES ============================")
         for tool_call in response_message.tool_calls:
             function_name = tool_call.function.name
             try:
@@ -150,7 +137,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                     function_response = azure_tools.procedures_and_treatments_price_list(
                         name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
                     )
-                    # print(f"==========🔹 Respuesta de listado de precios:", function_response)
+                    print(f"==========🔹 Respuesta de listado de precios:", function_response)
                 else:
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 
@@ -177,6 +164,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     final_message = final_response.choices[0].message
         
     clean_content = remove_doc_refs(final_message.content)
+
     if channel != "flow":
         # 💾 Save conversation in Redis (only the last N messages)
         if user_question != constants.CONTINUE_TOKEN:

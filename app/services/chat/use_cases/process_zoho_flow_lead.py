@@ -46,15 +46,6 @@ async def process_zoho_flow_lead(
                 }
             }
         
-        # logger.info(
-        #     "Processing Zoho Flow lead",
-        #     extra={
-        #         "request_id": request_id,
-        #         "session_id": session_id,
-        #         "intent": intent,
-        #     },
-        # )
-
         # 3. SOLO contexto, no instrucciones
         user_question = (
             f"Motivo de consulta del paciente: {intent}. "
