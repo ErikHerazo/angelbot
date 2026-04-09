@@ -20,6 +20,12 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     Execute a conversation with Azure OpenAI using RAG + parallel function calls.
     Compatible with the function calling pattern documented by Azure.
     """
+
+    if user_question == constants.CONTINUE_TOKEN:
+        if channel != "flow":
+            return "Aquí sigo contigo 😊 ¿Quieres continuar con lo anterior o tienes otra duda?"
+        return ""
+    
     deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
     client = get_azure_openai_client()
 
@@ -52,11 +58,8 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
 
     messages = [{"role": "system", "content": system_prompt}]
-
     messages.extend(history)
-
-    if user_question != constants.CONTINUE_TOKEN:
-        messages.append({"role": "user", "content": user_question})
+    messages.append({"role": "user", "content": user_question})
 
     question_length = len(user_question) if user_question else 0
     max_toks = (
@@ -107,7 +110,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     response = await make_completion(messages, max_toks)
     response_message = response.choices[0].message
 
-    print(f"============ Respuesta inicial: ", response_message)
+    # print(f"============ Respuesta inicial: ", response_message)
 
     # 🚀 Parallel call control (parallel tool calls)
     if response_message.tool_calls:
@@ -166,18 +169,10 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     clean_content = remove_doc_refs(final_message.content)
 
     if channel != "flow":
-        # 💾 Save conversation in Redis (only the last N messages)
-        if user_question != constants.CONTINUE_TOKEN:
-            history.extend([
-                {"role": "user", "content": user_question},
-                {"role": "assistant", "content": clean_content}
-            ])
-        else:
-            # Solo guardar la respuesta del assistant
-            history.append({
-                "role": "assistant",
-                "content": clean_content
-            })
+        history.append({
+            "role": "assistant",
+            "content": clean_content
+        })
 
         # keep only the last N messages
         if len(history) > MAX_HISTORY:
