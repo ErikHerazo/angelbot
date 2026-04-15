@@ -10,6 +10,7 @@ from app.services.cache.session_memory import SessionMemoryRedis
 
 from app.core.utils.language_detector import detect_language
 from app.core.utils.text_cleaner import remove_doc_refs
+from app.core.utils.translate_text import translate_text
 
 
 session_memory = SessionMemoryRedis()
@@ -39,6 +40,9 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     if lang is None:
         return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
+    traduccion = await translate_text(text=user_question,from_lang=lang, to_lang='es')
+    
+    print("========= texto traducido al espaniol ====:\n", traduccion)
 
     # Building the initial context
     if channel == "website":

@@ -206,6 +206,11 @@ OPENAI_MAX_TOKENS = 4096
 OPENAI_TIMEOUT = None
 OPENAI_MAX_RETRIES = 5
 
+# Azure Translator
+AZURE_TRANSLATOR_ENDPOINT="https://agb-translator.cognitiveservices.azure.com"
+AZURE_TRANSLATOR_PATH="/translator/text/v3.0/translate"
+AZURE_TRANSLATOR_LOCATION="westeurope"
+
 ZOHO_API_BASE = "https://salesiq.zoho.eu/api/v2/antiaginggroup/conversations"
 SCREENNAME = "antiaginggroup"
 ZOHOSALESIQ_SERVER_URI = "salesiq.zoho.eu"
