@@ -11,7 +11,7 @@ from app.services.cache.session_memory import SessionMemoryRedis
 from app.core.utils.language_detector import detect_language
 from app.core.utils.text_cleaner import remove_doc_refs
 from app.core.utils.translate_text import translate_text
-
+from app.services.cloud.azure.azure_search.query_service import AzureSearchQueryService
 
 session_memory = SessionMemoryRedis()
 MAX_HISTORY = 6
@@ -29,6 +29,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     
     deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
     client = get_azure_openai_client()
+    search_service = AzureSearchQueryService()
 
     # 🧠 Retrieve conversation history
     if channel == "flow":
@@ -40,9 +41,15 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     if lang is None:
         return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
-    traduccion = await translate_text(text=user_question,from_lang=lang, to_lang='es')
+    translated_text = await translate_text(text=user_question,from_lang=lang, to_lang='es')
     
-    print("========= texto traducido al espaniol ====:\n", traduccion)
+    chunks = await search_service.search_unstructured(translated_text)
+    if not chunks:
+        context = "No se encontró información relevante en la base de conocimiento."
+    else:
+        context = "\n\n".join(chunks)[:8000]
+
+    print("========== CONTEXT ==========\n", context[:500])
 
     # Building the initial context
     if channel == "website":
@@ -61,7 +68,16 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         print(f"============ CHANNEL: {channel}")
         system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
 
-    messages = [{"role": "system", "content": system_prompt}]
+    system_prompt_with_context = f"""
+    {system_prompt}
+
+    Usa el siguiente contexto para responder la pregunta del usuario.
+    Si la información no está en el contexto, responde de forma general y aclara que no está en la base de conocimiento.
+
+    Contexto:
+    {context}
+    """
+    messages = [{"role": "system", "content": system_prompt_with_context}]
     messages.extend(history)
     messages.append({"role": "user", "content": user_question})
 
@@ -83,31 +99,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
             tool_choice="none" if force_text else "auto",
             temperature=constants.OPENAI_TEMPERATURE,
             max_tokens=max_toks,
-            extra_body={
-                "data_sources": [
-                    {
-                        "type": "azure_search",
-                        "parameters": {
-                            "endpoint": os.environ["AZURE_AI_SEARCH_ENDPOINT"],
-                            "index_name": os.environ["AZURE_AI_SEARCH_INDEX"],
-                            "authentication": {
-                                "type": "api_key",
-                                "key": os.environ["AZURE_AI_SEARCH_API_KEY"],
-                            },
-                            "semantic_configuration": os.environ["SEMANTIC_CONFIGURATION"],
-                            "fields_mapping": {
-                                "content_fields": ["chunk"],
-                                "title_field": "title"
-                            },
-                            "embedding_dependency": {
-                                "type": "deployment_name",
-                                "deployment_name": os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
-                            },
-                            "in_scope": True
-                        },
-                    },
-                ]
-            },
         )
 
     # 🌀 First call with retry
