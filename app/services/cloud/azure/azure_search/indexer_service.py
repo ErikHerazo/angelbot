@@ -6,7 +6,7 @@ from app.core.config import Settings
 logger = logging.getLogger(__name__)
 
 
-class AzureSearchService:
+class AzureSearchIndexerService:
 
     def __init__(self):
         self.indexer_name = Settings.AZURE_SEARCH_INDEXER_NAME

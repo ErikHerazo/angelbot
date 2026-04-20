@@ -1,5 +1,5 @@
 import logging
-from app.services.cloud.azure.azure_search_service import AzureSearchService
+from app.services.cloud.azure.azure_search.indexer_service import AzureSearchIndexerService
 from app.tasks.celery import app
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ def add(x, y):
 def run_search_indexer(self):
 
     try:
-        service = AzureSearchService()
+        service = AzureSearchIndexerService()
 
         result = service.run_indexer()
 
