@@ -6,7 +6,6 @@ from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
 
-
 class AzureSearchQueryService:
 
     def __init__(self):

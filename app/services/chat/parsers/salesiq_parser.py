@@ -3,7 +3,6 @@ from app.core import constants
 
 
 def parse_zoho_sales_payload(body: dict) -> ChatEvent:
-    print(" === entrando en parse zoho sales ===")
 
     handler = body.get("handler")
     message = body.get("message") or {}

@@ -9,19 +9,8 @@ from app.services.chat.zoho_message_processor import process_message_async
 
 logger = logging.getLogger(__name__)
 
-
 def handle_message(event: ChatEvent):
     session_id = event.session_id or str(uuid.uuid4())
-
-    # logger.info(
-    #     "Message webhook received",
-    #     extra={
-    #         "source": event.source,
-    #         "event_type": event.event_type,
-    #         "session_id": session_id,
-    #         "has_question": bool(event.message),
-    #     },
-    # )
 
     asyncio.create_task(
         process_message_async(

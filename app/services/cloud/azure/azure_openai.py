@@ -1,17 +1,20 @@
 import os
 import json
-
+from dotenv import load_dotenv
 from app.core import constants
 from app.core.logging_config import logger
 
 from app.services.cloud.azure import azure_tools
-from app.services.cloud.azure.client import get_azure_openai_client
 from app.services.cache.session_memory import SessionMemoryRedis
 
 from app.core.utils.language_detector import detect_language
 from app.core.utils.text_cleaner import remove_doc_refs
 from app.core.utils.translate_text import translate_text
-from app.services.cloud.azure.azure_search.query_service import AzureSearchQueryService
+
+from app.services.cloud.azure.make_completion import make_completion
+from app.services.cloud.azure.token_utils import token_estimate
+
+load_dotenv()
 
 session_memory = SessionMemoryRedis()
 MAX_HISTORY = 6
@@ -27,10 +30,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
             return "Aquí sigo contigo 😊 ¿Quieres continuar con lo anterior o tienes otra duda?"
         return ""
     
-    deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
-    client = get_azure_openai_client()
-    search_service = AzureSearchQueryService()
-
     # 🧠 Retrieve conversation history
     if channel == "flow":
         history=[]
@@ -38,68 +37,49 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         history = await session_memory.get_session(session_id)
 
     lang = detect_language(user_question)
-
-    if lang is None:
-        return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
-    translated_text = await translate_text(text=user_question,from_lang=lang, to_lang='es')
+    print("========= Idioma detectado ====:", lang)
+    print("========= texto original ====:\n", user_question)
     
-    chunks = await search_service.search_unstructured(translated_text)
-    if not chunks:
-        context = "No se encontró información relevante en la base de conocimiento."
-    else:
-        context = "\n\n".join(chunks)[:8000]
-
-    print("========== CONTEXT ==========\n", context[:500])
+    if lang not in constants.MAP_ALLOWED_LANG:
+        return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
+    
+    prompt_user_lang = constants.MAP_ALLOWED_LANG[lang]
+    rag_query = await translate_text(
+        text=user_question,
+        from_lang=lang,
+        to_lang='es'
+    )
+    print("========= texto traducido al espaniol ====:\n", rag_query)
 
     # Building the initial context
     if channel == "website":
         print(f"============ CHANNEL: {channel}")
-        system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
+        base_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
     elif channel == "whatsapp":
         print(f"============ CHANNEL: {channel}")
-        system_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
+        base_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
     elif channel == "instagram":
         print(f"============ CHANNEL: {channel}")
-        system_prompt = constants.INSTAGRAM_ASSISTANT_PROMPT.strip()
+        base_prompt = constants.INSTAGRAM_ASSISTANT_PROMPT.strip()
     elif channel == "flow":
         print(f"============ CHANNEL: {channel}")
-        system_prompt = constants.FLOW_FORM_ASSISTANT_PROMPT.strip()
+        base_prompt = constants.FLOW_FORM_ASSISTANT_PROMPT.strip()
     else:
         print(f"============ CHANNEL: {channel}")
-        system_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
+        base_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
 
-    system_prompt_with_context = f"""
-    {system_prompt}
-
-    Usa el siguiente contexto para responder la pregunta del usuario.
-    Si la información no está en el contexto, responde de forma general y aclara que no está en la base de conocimiento.
-
-    Contexto:
-    {context}
-    """
-    messages = [{"role": "system", "content": system_prompt_with_context}]
+    system_prompt = base_prompt.format(original_lang=prompt_user_lang)
+    
+    messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
-    messages.append({"role": "user", "content": user_question})
+    messages.append({"role": "user", "content": rag_query})
 
-    question_length = len(user_question) if user_question else 0
+    question_tokens = token_estimate(text=rag_query, model=constants.OPENAI_BASE_MODEL_NAME)
     max_toks = (
         constants.OPENAI_MAX_TOKENS
-        if question_length > 200
+        if question_tokens > 200
         else int(constants.OPENAI_MAX_TOKENS / 3)
     )
-    async def make_completion(messages, max_toks, force_text=False):
-        """
-        Make a call to Azure OpenAI ChatCompletion.
-        If `force_text=True`, force tool_choice='none' to prevent further tool calls.
-        """
-        return await client.chat.completions.create(
-            model=deployment_name,
-            messages=messages,
-            tools=azure_tools.tools,
-            tool_choice="none" if force_text else "auto",
-            temperature=constants.OPENAI_TEMPERATURE,
-            max_tokens=max_toks,
-        )
 
     # 🌀 First call with retry
     response = await make_completion(messages, max_toks)
@@ -162,11 +142,19 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     final_message = final_response.choices[0].message
         
     clean_content = remove_doc_refs(final_message.content)
+    final_answer = clean_content
+
+    if lang != "es":
+        final_answer = await translate_text(
+            text=clean_content,
+            from_lang="es",
+            to_lang=lang
+        )
 
     if channel != "flow":
         history.append({
             "role": "assistant",
-            "content": clean_content
+            "content": final_answer
         })
 
         # keep only the last N messages
@@ -176,5 +164,4 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         await session_memory.connect()
         await session_memory.save_session(session_id, history)
 
-    return clean_content
-    
+    return final_answer
