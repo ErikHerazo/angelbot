@@ -5,7 +5,6 @@ from app.services.chat.zoho_dispatcher import dispatch_zoho_webhook
 
 
 router = APIRouter()
-
 logger = logging.getLogger(__name__)
 
 @router.get("/zoho-test", include_in_schema=False)
@@ -28,6 +27,4 @@ async def webhook_get():
 # --- MAIN ENDPOINT ---
 @router.post("/webhook")
 async def zoho_bot_webhook(request: Request):
-    # print("=== Headers ===\n", dict(request.headers))
-    # print("=== Body ===\n", await request.body())
     return await dispatch_zoho_webhook(request)
