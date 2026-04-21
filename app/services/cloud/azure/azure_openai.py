@@ -13,6 +13,8 @@ from app.core.utils.translate_text import translate_text
 
 from app.services.cloud.azure.make_completion import make_completion
 from app.services.cloud.azure.token_utils import token_estimate
+from app.core.utils.get_base_prompt_by_channel import get_base_prompt_by_channel
+
 
 load_dotenv()
 
@@ -37,8 +39,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         history = await session_memory.get_session(session_id)
 
     lang = detect_language(user_question)
-    print("========= Idioma detectado ====:", lang)
-    print("========= texto original ====:\n", user_question)
     
     if lang not in constants.MAP_ALLOWED_LANG:
         return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
@@ -49,25 +49,9 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         from_lang=lang,
         to_lang='es'
     )
-    print("========= texto traducido al espaniol ====:\n", rag_query)
 
     # Building the initial context
-    if channel == "website":
-        print(f"============ CHANNEL: {channel}")
-        base_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
-    elif channel == "whatsapp":
-        print(f"============ CHANNEL: {channel}")
-        base_prompt = constants.WHATSAPP_ASSISTANT_PROMPT.strip()
-    elif channel == "instagram":
-        print(f"============ CHANNEL: {channel}")
-        base_prompt = constants.INSTAGRAM_ASSISTANT_PROMPT.strip()
-    elif channel == "flow":
-        print(f"============ CHANNEL: {channel}")
-        base_prompt = constants.FLOW_FORM_ASSISTANT_PROMPT.strip()
-    else:
-        print(f"============ CHANNEL: {channel}")
-        base_prompt = constants.WEBSITE_ASSISTANT_PROMPT.strip()
-
+    base_prompt = get_base_prompt_by_channel(channel)
     system_prompt = base_prompt.format(original_lang=prompt_user_lang)
     
     messages = [{"role": "system", "content": system_prompt}]
@@ -84,8 +68,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     # 🌀 First call with retry
     response = await make_completion(messages, max_toks)
     response_message = response.choices[0].message
-
-    # print(f"============ Respuesta inicial: ", response_message)
 
     # 🚀 Parallel call control (parallel tool calls)
     if response_message.tool_calls:
@@ -131,7 +113,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
             })
 
     else:
-        # logger.info("ℹ️ No tool calls were detected in the initial response.")
         messages.append({
             "role": response_message.role,
             "content": response_message.content or "",
