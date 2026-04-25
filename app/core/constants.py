@@ -258,6 +258,9 @@ REGLA DE PRECIOS:
   Si la función no devuelve información de precios, DEBES indicar explícitamente que no hay precios disponibles y NO debes recurrir ni tomar en cuenta informacion de otros documentos, ni generar estimaciones.
 """
 
+from pathlib import Path
+
+
 # Azure OpenAI settings
 AZURE_OPENAI_API_VERSION = "2025-01-01-preview"
 OPENAI_TEMPERATURE = 0.2
@@ -271,6 +274,11 @@ AZURE_TRANSLATOR_ENDPOINT="https://agb-translator.cognitiveservices.azure.com"
 AZURE_TRANSLATOR_PATH="/translator/text/v3.0/translate"
 AZURE_TRANSLATOR_LOCATION="westeurope"
 
+# Azure Detct
+AZURE_DETECT_ENDPOINT = "https://agb-translator.cognitiveservices.azure.com"
+AZURE_DETECT_PATH = "/translator/text/v3.0/detect?api-version=3.0"
+AZURE_DETECT_LOCATION="westeurope"
+
 ZOHO_API_BASE = "https://salesiq.zoho.eu/api/v2/antiaginggroup/conversations"
 SCREENNAME = "antiaginggroup"
 ZOHOSALESIQ_SERVER_URI = "salesiq.zoho.eu"
@@ -281,16 +289,11 @@ PENDING_PAYLOAD = {
 }
 
 MIN_LANG_DETECTION_LEN=6
-SUPPORTED_LANGUAGES = {
-    "en",  # inglés
-    "es",  # español
-    "ru",  # ruso
-    "ca",  # catalán
-}
+
+SUPPORTED_LANGUAGES_MESSAGE="Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
 
 CONTINUE_TOKEN = "__CONTINUE__"
-
-from pathlib import Path
+RESPONSE_TO_THE_CONTINUE_TOKEN_MESSAGE="Aquí sigo contigo 😊 ¿Quieres continuar con lo anterior o tienes otra duda?"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 WEB_DIR = PROJECT_ROOT / "app" / "web"
