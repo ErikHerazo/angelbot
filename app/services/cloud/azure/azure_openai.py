@@ -7,13 +7,15 @@ from app.core.logging_config import logger
 from app.services.cloud.azure import azure_tools
 from app.services.cache.session_memory import SessionMemoryRedis
 
-from app.core.utils.language_detector import detect_language
 from app.core.utils.text_cleaner import remove_doc_refs
-from app.core.utils.translate_text import translate_text
+from app.services.cloud.azure.translate_text import translate_text
+from app.core.utils.get_base_prompt_by_channel import get_base_prompt_by_channel
 
 from app.services.cloud.azure.make_completion import make_completion
 from app.services.cloud.azure.token_utils import token_estimate
-from app.core.utils.get_base_prompt_by_channel import get_base_prompt_by_channel
+from app.services.cloud.azure.azure_language_detector import detect_language_azure
+from app.services.zoho.handle_continue_token import handle_continue_token
+from app.core.utils.validate_supported_language import validate_supported_language
 
 
 load_dotenv()
@@ -26,19 +28,24 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     Execute a conversation with Azure OpenAI using RAG + parallel function calls.
     Compatible with the function calling pattern documented by Azure.
     """
-
-    if user_question == constants.CONTINUE_TOKEN:
-        if channel != "flow":
-            return "Aquí sigo contigo 😊 ¿Quieres continuar con lo anterior o tienes otra duda?"
-        return ""
     
+    response = handle_continue_token(user_question, channel)
+    if response is not None:
+        return response
+    
+    lang = await detect_language_azure(user_question)
+    
+    if error_msg := await validate_supported_language(lang):
+        return error_msg
+
+    if not lang:
+        lang = "es"
+
     # 🧠 Retrieve conversation history
     if channel == "flow":
         history=[]
     else:
         history = await session_memory.get_session(session_id)
-
-    lang = detect_language(user_question)
     
     if lang not in constants.MAP_ALLOWED_LANG:
         return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
@@ -71,7 +78,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     # 🚀 Parallel call control (parallel tool calls)
     if response_message.tool_calls:
-        print("============= LLAMANDO DE FUNCIONES ============================")
         for tool_call in response_message.tool_calls:
             function_name = tool_call.function.name
             try:
