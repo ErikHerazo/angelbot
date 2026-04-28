@@ -92,54 +92,6 @@ def ensure_users_table():
     except Exception as error:
         print(f"⚠️ Failed to ensure 'users' table exists: {error}")
 
-def save_user(name: str, email: str):
-    """
-    Inserta un nuevo registro en la tabla 'users' si no existe previamente.
-    Retorna un string JSON con:
-      - message: texto explicativo que el modelo o el frontend pueden usar.
-    """
-
-    # 🧹 Normalización básica
-    name = name.strip().title() if name else ""
-    email = email.strip().lower() if email else ""
-
-    check_query = "SELECT COUNT(*) FROM users WHERE email = ?;"
-    insert_query = "INSERT INTO users (name, email) VALUES (?, ?);"
-
-    try:
-        ensure_users_table()  # Asegura que la tabla exista
-
-        with connection.get_connection() as conn:
-            with conn.cursor() as cursor:
-                # 🔍 Validar si el usuario ya existe
-                cursor.execute(check_query, (email,))
-                exists = cursor.fetchone()[0] > 0
-
-                if exists:
-                    logger.info(f"⚠️ Usuario existente: {email}")
-                    return json.dumps({
-                        "status": "already_exists",
-                        "message": f"El correo '{email}' ya está registrado. Intente con otro o contacte soporte."
-                    })
-
-                # 🆕 Insertar nuevo usuario
-                cursor.execute(insert_query, (name, email))
-                conn.commit()
-
-        logger.info(f"✅ Usuario registrado correctamente: {name} <{email}>")
-
-        return json.dumps({
-            "status": "created",
-            "message": f"Usuario '{name}' con correo '{email}' registrado correctamente."
-        })
-
-    except Exception as error:
-        logger.error(f"❌ Error al registrar usuario [{email}]: {error}")
-        return json.dumps({
-            "status": "error",
-            "message": f"No se pudo registrar al usuario '{name}' con correo '{email}'. Error: {error}"
-        })
-
 def normalize_text(text: str) -> str:
     """
     Normaliza un texto para búsquedas:

@@ -47,6 +47,17 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     else:
         history = await session_memory.get_session(session_id)
     
+    # 🔥 INYECTAR MENSAJE INICIAL (SOLO CHAT)
+    if channel != "flow" and not history:
+        history.append({
+            "role": "assistant",
+            "content": constants.INITIAL_ASSISTANT_MESSAGE
+        })
+
+    print("======== \n🧠 HISTORY ACTUAL:")
+    for i, msg in enumerate(history):
+        print(f"{i} - {msg['role']}: {msg['content']}")    
+
     if lang not in constants.MAP_ALLOWED_LANG:
         return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
     
@@ -94,11 +105,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                     function_response = azure_tools.is_customer_service_available(
                         input=function_args.get("input")
                     )
-                elif function_name == "save_user":
-                    function_response = azure_tools.save_user(
-                        name=function_args.get("name"),
-                        email=function_args.get("email"),
-                    )
+                    print(f"==========🔹 Respuesta is_customer_service_available:", function_response)
                 elif function_name == "procedures_and_treatments_price_list":
                     function_response = azure_tools.procedures_and_treatments_price_list(
                         name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
@@ -140,11 +147,19 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     if channel != "flow":
         history.append({
+            "role": "user",
+            "content": user_question
+        })
+
+        history.append({
             "role": "assistant",
             "content": final_answer
         })
 
-        # keep only the last N messages
+        print("\n🧠 HISTORY FINAL (DESPUÉS DE GUARDAR):")
+        for i, msg in enumerate(history):
+            print(f"{i} - {msg['role']}: {msg['content']}")
+
         if len(history) > MAX_HISTORY:
             history = history[-MAX_HISTORY:]
 
