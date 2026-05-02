@@ -15,8 +15,15 @@ def parse_zoho_sales_payload(body: dict) -> ChatEvent:
     meta = message.get("meta") or {}
     card_data = meta.get("card_data")
 
+    message_type = message.get("type")
+    attachments = body.get("attachments") or []
+
     if card_data and card_data.get("id") == "continue":
         user_message = constants.CONTINUE_TOKEN
+
+    elif message_type == "files":
+        user_message = None
+
     elif message.get("text"):
         user_message = message["text"]
     else:
@@ -32,6 +39,8 @@ def parse_zoho_sales_payload(body: dict) -> ChatEvent:
         user_email=visitor.get("email"),
         user_phone=visitor.get("phone"),
         message=user_message,
+        message_type=message_type,
+        attachments=attachments,
         intent=None,
         metadata={
             "channel": visitor.get("channel"),
