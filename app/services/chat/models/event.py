@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Optional, Dict
+from dataclasses import dataclass, field
+from typing import Optional, Dict, List
 
 
 @dataclass
@@ -18,6 +18,9 @@ class ChatEvent:
     message: Optional[str] = None
     intent: Optional[str] = None
 
-    metadata: Dict = None
-    raw: dict = None
+    message_type: Optional[str] = None
+    attachments: List[Dict] = field(default_factory=list)
+
+    metadata: Dict = field(default_factory=dict)
+    raw: dict = field(default_factory=dict)
     

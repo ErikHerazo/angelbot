@@ -12,7 +12,6 @@ async def dispatch_zoho_webhook(request: Request):
     try:
         headers = request.headers
         body_bytes = await request.body()
-
         source = detect_zoho_source(headers)
 
         # Validations
@@ -24,6 +23,8 @@ async def dispatch_zoho_webhook(request: Request):
             raise HTTPException(status_code=400, detail="Unknown Zoho source")
 
         body_json = json.loads(body_bytes)
+        print(f'===== headers: {headers}')
+        print(f'===== body_json: {body_json}')
 
         if source == "salesiq":
             event = parse_zoho_sales_payload(body_json)
