@@ -14,7 +14,9 @@ async def dispatch_zoho_webhook(request: Request):
         body_bytes = await request.body()
         source = detect_zoho_source(headers)
 
-        # Validations
+        # Webhook Security:
+        # - salesiq → validates RSA cryptographic signature and reinjects the body (FastAPI stream)
+        # - flow → validates secret via secure comparison (hmac.compare_digest)
         if source == "salesiq":
             await security.validate_zoho_sales_webhook(request)
         elif source == "flow":
@@ -23,9 +25,9 @@ async def dispatch_zoho_webhook(request: Request):
             raise HTTPException(status_code=400, detail="Unknown Zoho source")
 
         body_json = json.loads(body_bytes)
-        print(f'===== headers: {headers}')
-        print(f'===== body_json: {body_json}')
 
+        # Adapter layer: transforms heterogeneous Zoho payloads into an internal model (ChatEvent)
+        # to decouple business logic from the data source (chat vs. form)
         if source == "salesiq":
             event = parse_zoho_sales_payload(body_json)
         else:

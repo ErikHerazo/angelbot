@@ -1,8 +1,13 @@
 import os
+import logging
+from dotenv import load_dotenv
 from app.core import constants
 from app.services.cloud.azure.client import get_azure_openai_client
 from app.services.cloud.azure import azure_tools
 
+
+load_dotenv()
+logger = logging.getLogger(__name__)
 
 client = get_azure_openai_client()
 deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAIN")
@@ -12,6 +17,15 @@ async def make_completion(messages, max_toks, force_text=False):
     Make a call to Azure OpenAI ChatCompletion.
     If `force_text=True`, force tool_choice='none' to prevent further tool calls.
     """
+    # 🔥 LOG DEL MODELO USADO
+    logger.info(
+        "Executing Azure OpenAI completion",
+        extra={
+            "deployment": deployment_name,
+            "max_tokens": max_toks,
+            "force_text": force_text,
+        }
+    )
     return await client.chat.completions.create(
         model=deployment_name,
         messages=messages,
