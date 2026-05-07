@@ -22,13 +22,14 @@ def handle_message(event: ChatEvent):
                 "text": "For this type of information, please send it to our email address."
             }]
         }
-    asyncio.create_task(
-        process_message_async(
-            request_id=event.request_id,
-            session_id=session_id,
-            user_question=event.message,
-            channel=event.metadata.get("channel"),
+    else:
+        asyncio.create_task(
+            process_message_async(
+                request_id=event.request_id,
+                session_id=session_id,
+                user_question=event.message,
+                channel=event.metadata.get("channel"),
+            )
         )
-    )
 
-    return constants.PENDING_PAYLOAD
+        return constants.PENDING_PAYLOAD

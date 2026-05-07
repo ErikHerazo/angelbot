@@ -258,3 +258,15 @@ MAP_ALLOWED_LANG = {
       "ru": "Ruso",
       "ca": "Catalán"
 }
+
+FALLBACK_MESSAGE = (
+    "⚠️ Your request could not be processed at this time. " 
+    "Please try again."
+)
+
+# Azure OpenAi sumarry text
+AZURE_OPENAI_SUMMARY_ENDPOINT="https://azure-openai-angelbot-main.cognitiveservices.azure.com/"
+AZURE_OPENAI_SUMMARY_VERSION="2025-04-01-preview"
+AZURE_OPENAI_SUMMARY_DEPLOYMENT_NAME="gpt-5.4-mini-ig-length-safe-responses"
+
+INSTAGRAM_CHARACTER_LIMIT=900

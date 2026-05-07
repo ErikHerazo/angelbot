@@ -1,21 +1,18 @@
 fastapi==0.116.1
-openai==1.98.0
+openai==2.35.0
 uvicorn==0.35.0
 python-dotenv===1.1.1
 azure-search-documents==11.5.3
 azure-storage-blob==12.26.0
 python-multipart==0.0.20
-langchain-openai==0.3.28
-# langsmith==0.4.11
 Jinja2==3.1.6
-langdetect==1.0.9
 pyodbc==5.2.0
 holidays==0.82
 azure-identity==1.20.0
 azure-ai-translation-text==1.0.1
 redis-entraid==1.0.0
 pandas==2.3.3
-fast-langdetect==1.0.0
 Jinja2==3.1.6
 celery==5.6.2
 tiktoken==0.12.0
+langchain-openai==1.2.1

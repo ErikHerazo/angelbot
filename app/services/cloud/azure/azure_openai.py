@@ -21,7 +21,6 @@ from app.core.utils.validate_supported_language import validate_supported_langua
 load_dotenv()
 
 session_memory = SessionMemoryRedis()
-MAX_HISTORY = 6
 
 async def run_conversation_with_rag(session_id: str, user_question: str, channel: str="website"):
     """
@@ -54,10 +53,8 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
             "content": constants.INITIAL_ASSISTANT_MESSAGE
         })
 
-    print("======== \n🧠 HISTORY ACTUAL:")
-    for i, msg in enumerate(history):
-        print(f"{i} - {msg['role']}: {msg['content']}")    
-
+    logger.debug("History", extra={"history": history})
+    
     if lang not in constants.MAP_ALLOWED_LANG:
         return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
     
@@ -77,6 +74,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     messages.append({"role": "user", "content": rag_query})
 
     question_tokens = token_estimate(text=rag_query, model=constants.OPENAI_BASE_MODEL_NAME)
+    
     max_toks = (
         constants.OPENAI_MAX_TOKENS
         if question_tokens > 200
@@ -105,12 +103,12 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                     function_response = azure_tools.is_customer_service_available(
                         input=function_args.get("input")
                     )
-                    print(f"==========🔹 Respuesta is_customer_service_available:", function_response)
+                    # print(f"==========🔹 Respuesta is_customer_service_available:", function_response)
                 elif function_name == "procedures_and_treatments_price_list":
                     function_response = azure_tools.procedures_and_treatments_price_list(
                         name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
                     )
-                    print(f"==========🔹 Respuesta de listado de precios:", function_response)
+                    # print(f"==========🔹 Respuesta de listado de precios:", function_response)
                 else:
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 
@@ -144,26 +142,5 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
             from_lang="es",
             to_lang=lang
         )
-
-    if channel != "flow":
-        history.append({
-            "role": "user",
-            "content": user_question
-        })
-
-        history.append({
-            "role": "assistant",
-            "content": final_answer
-        })
-
-        print("\n🧠 HISTORY FINAL (DESPUÉS DE GUARDAR):")
-        for i, msg in enumerate(history):
-            print(f"{i} - {msg['role']}: {msg['content']}")
-
-        if len(history) > MAX_HISTORY:
-            history = history[-MAX_HISTORY:]
-
-        await session_memory.connect()
-        await session_memory.save_session(session_id, history)
 
     return final_answer

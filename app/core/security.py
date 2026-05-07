@@ -88,7 +88,6 @@ async def validate_zoho_sales_webhook(request: Request) -> bytes:
                 status_code=403,
                 detail="Invalid signature"
             )
-        logger.info("✅ Zoho webhook RSA signature VALIDATED successfully")
     else:
         raise HTTPException(
             status_code=400,
@@ -98,7 +97,6 @@ async def validate_zoho_sales_webhook(request: Request) -> bytes:
     async def receive():
         return {"type": "http.request", "body": body}
     request._receive = receive
-    # logger.info("Zoho webhook signature validated")
     return body
 
 async def validate_zoho_flow_webhook(request: Request):
