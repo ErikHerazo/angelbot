@@ -1,0 +1,41 @@
+location: West US 2
+name: celery-worker
+type: Microsoft.App/containerApps
+
+properties:
+  managedEnvironmentId: /subscriptions/beebb37f-a9aa-45b4-a54e-2264c96b07ae/resourceGroups/Angelbot_rg/providers/Microsoft.App/managedEnvironments/angelbot-env
+
+  configuration:
+    ingress: null
+
+    registries:
+      - server: angelbotacr01-dhfpdmekfqd5h0h4.azurecr.io
+        username: angelbotacr01
+        passwordSecretRef: acr-password
+
+    secrets:
+      - name: acr-password
+        value: YOUR_ACR_PASSWORD
+
+  template:
+    containers:
+      - image: angelbotacr01-dhfpdmekfqd5h0h4.azurecr.io/angelbot/backend:0.72.0
+        name: celery-worker
+
+        command:
+          - celery
+
+        args:
+          - -A
+          - app.tasks.celery.app
+          - worker
+          - --loglevel=info
+          - --concurrency=2
+
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+
+    scale:
+      minReplicas: 1
+      maxReplicas: 3
