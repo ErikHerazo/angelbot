@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 # Carga las variables del .env
 load_dotenv(dotenv_path="/app/.env")
+APP_ENV = os.getenv("APP_ENV", "local")
 
 class Settings:
     # Blob
@@ -20,8 +21,23 @@ class Settings:
     AZURE_SEARCH_INDEXER_NAME = os.getenv("AZURE_AI_SEARCH_INDEXER")
 
     # Redis
-    CELERY_BROKER_URL=os.getenv("CELERY_BROKER_URL")
-    CELERY_RESULT_BACKEND=os.getenv("CELERY_RESULT_BACKEND")
+    if APP_ENV == "prod":
+        REDIS_HOST = os.getenv("REDIS_HOST_PROD")
+        REDIS_PORT = os.getenv("REDIS_PORT_PROD")
+        REDIS_PASSWORD = os.getenv("REDIS_PASSWORD_PROD")
+
+        CELERY_BROKER_URL = (
+            f"rediss://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
+            "?ssl_cert_reqs=CERT_NONE"
+        )
+
+        CELERY_RESULT_BACKEND = (
+            f"rediss://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
+            "?ssl_cert_reqs=CERT_NONE"
+        )
+    else:
+        CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL_LOCAL")
+        CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND_LOCAL")
 
 settings = Settings()
 
