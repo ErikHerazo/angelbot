@@ -26,6 +26,14 @@
         </div>
 
         <div class="mb-3">
+          <label for="metadataInput" class="form-label">
+            Select metadata JSON
+          </label>
+
+          <input class="form-control" type="file" id="metadataInput" accept=".json">
+        </div>
+
+        <div class="mb-3">
           <label for="containerSelect" class="form-label">Select container</label>
           <select class="form-select" id="containerSelect">
             {% if containers %}
@@ -152,6 +160,19 @@
       const fileInput = document.getElementById("fileInput");
       const file = fileInput.files[0];
 
+      const metadataInput =
+        document.getElementById("metadataInput");
+
+      const metadataFile =
+        metadataInput.files[0];
+
+      if (!metadataFile) {
+        errorMsg.textContent =
+          "No metadata JSON selected";
+
+        errorMsg.classList.remove("d-none");
+        return;
+      }
       const container = document.getElementById("containerSelect").value;
       const prefix = document.getElementById("prefixSelect").value;
 
@@ -190,6 +211,18 @@
           errorMsg.classList.remove("d-none");
           return;
         }
+
+        const metadataText =
+          await metadataFile.text();
+
+        const metadata =
+          JSON.parse(metadataText);
+
+        // 👇 enviar metadata
+        formData.append(
+          "metadata",
+          JSON.stringify(metadata)
+        );
 
         const response = await fetch("/upload/to-azure", {
           method: "POST",

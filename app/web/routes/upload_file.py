@@ -1,3 +1,4 @@
+import json
 import logging
 from app.core import constants
 from app.core.config import Settings
@@ -99,9 +100,18 @@ async def get_prefixes(
 async def upload_to_azure(
     file: UploadFile = File(...),
     container_name: str = Form(...),
-    prefix: str = Form(None)
+    prefix: str = Form(None),
+    metadata: str = Form(...)
 ):
     try:
+        print("METADATA RAW:")
+        print(metadata)
+
+        metadata_dict = json.loads(metadata)
+
+        print("METADATA PARSEADA:")
+        print(metadata_dict)
+
         allowed = azure_service.list_containers()
 
         if container_name not in allowed:
@@ -110,9 +120,11 @@ async def upload_to_azure(
         file_validators.validate_extension(file)
         file_validators.validate_size(file)
 
+
         blob_name = azure_service.upload_blob_stream(
             container_name=container_name,
             file=file,
+            metadata=metadata_dict,
             prefix=prefix
         )
 

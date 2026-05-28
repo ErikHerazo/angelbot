@@ -1,10 +1,11 @@
 import re
 import io
+import json
 import pandas as pd
 from azure.storage.blob import BlobServiceClient
 from app.core.config import settings
 from app.core.logging_config import logger
-
+from app.core.utils.normalize_metadata import normalize_blob_metadata
 
 class AzureBlobService:
     def __init__(self):
@@ -62,21 +63,22 @@ class AzureBlobService:
             return blobs
         except Exception as e:
             logger.error(f"❌ Error listando blobs: {e}")
-            raise
-
+            raise    
+  
     # === CREATE/UPDATE (STREAM) ===
     def upload_blob_stream(
         self,
         container_name: str,
         file,
+        metadata: dict | None = None,
         prefix: str | None = None
     ) -> str:
+
         try:
-            # Basic filename sanitization
+
             safe_name = file.filename.strip().replace(" ", "_")
             safe_name = re.sub(r"[^a-zA-Z0-9_.-]", "", safe_name)
 
-            # Build blob name using prefix if provided
             if prefix:
                 prefix = prefix if prefix.endswith("/") else f"{prefix}/"
                 blob_name = f"{prefix}{safe_name}"
@@ -88,10 +90,19 @@ class AzureBlobService:
                 blob=blob_name
             )
 
-            blob_client.upload_blob(file.file, overwrite=True)
+            blob_metadata = {}
+
+            if metadata:
+                blob_metadata = normalize_blob_metadata(metadata)
+
+            blob_client.upload_blob(
+                file.file,
+                overwrite=True,
+                metadata=blob_metadata
+            )
 
             logger.info(
-                f"✅ Archivo '{blob_name}' subido por stream al contenedor '{container_name}'."
+                f"✅ Archivo '{blob_name}' subido con metadata al contenedor '{container_name}'."
             )
 
             return blob_name
