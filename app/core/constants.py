@@ -202,12 +202,16 @@ REGLA DE PRECIOS:
 from pathlib import Path
 
 # Azure OpenAI settings
+BASE_URL="https://azure-openai-angelbot-main.openai.azure.com"
+DEPLOYMENT_NAME_PRIMARY="gpt-4o-agb"
+DEPLOYMENT_NAME_SECONDARY="gpt-4o-mini-secondary"
 AZURE_OPENAI_API_VERSION = "2025-01-01-preview"
 OPENAI_TEMPERATURE = 0.2
 OPENAI_MAX_TOKENS = 4096
 OPENAI_TIMEOUT = None
-OPENAI_MAX_RETRIES = 5
+OPENAI_MAX_RETRIES = 0
 OPENAI_BASE_MODEL_NAME="gpt-4o"
+
 
 # Azure Translator
 AZURE_TRANSLATOR_ENDPOINT="https://agb-translator.cognitiveservices.azure.com"
