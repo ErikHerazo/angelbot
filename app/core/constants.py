@@ -204,6 +204,7 @@ from pathlib import Path
 # Azure OpenAI settings
 BASE_URL="https://azure-openai-angelbot-main.openai.azure.com"
 DEPLOYMENT_NAME_PRIMARY="gpt-4o-agb"
+# DEPLOYMENT_NAME_PRIMARY="gpt-4o-mini-primary"
 DEPLOYMENT_NAME_SECONDARY="gpt-4o-mini-secondary"
 AZURE_OPENAI_API_VERSION = "2025-01-01-preview"
 OPENAI_TEMPERATURE = 0.2

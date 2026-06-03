@@ -5,8 +5,7 @@ from openai import (
     APITimeoutError,
     APIConnectionError,
     RateLimitError,
-    InternalServerError,
-    BadRequestError,
+    InternalServerError
 )
 from app.services.cloud.azure.client import primary_client, secondary_client
 
@@ -48,7 +47,11 @@ class FailoverLoadBalancer:
         if self.primary_retry_at is None:
             return False
 
-        return datetime.now(timezone.utc) >= self.primary_retry_at
+        if datetime.now(timezone.utc) >= self.primary_retry_at:
+            self._enable_primary()
+            return True
+
+        return False
 
     def _extract_retry_after(self, error: RateLimitError) -> int:
         cooldown = self.DEFAULT_COOLDOWN_SECONDS
@@ -89,20 +92,14 @@ class FailoverLoadBalancer:
                 cooldown = self._extract_retry_after(ex)
 
                 self._block_primary(cooldown)
-
-                return await request_callable(
-                    secondary_client,
-                    constants.DEPLOYMENT_NAME_SECONDARY
-                )
-            
-            except BadRequestError as ex:
                 logger.warning(
-                    "PRIMARY BadRequestError. Switching to SECONDARY",
+                    "Failing over request to SECONDARY",
                     extra={
+                        "reason": "RateLimitError",
+                        "cooldown_seconds": cooldown,
                         "error": str(ex)
                     }
                 )
-                self._block_primary(self.DEFAULT_COOLDOWN_SECONDS)
                 return await request_callable(
                     secondary_client,
                     constants.DEPLOYMENT_NAME_SECONDARY
@@ -112,19 +109,27 @@ class FailoverLoadBalancer:
                 APITimeoutError,
                 APIConnectionError,
                 InternalServerError,
-            ):
+            ) as ex:
 
                 self._block_primary(self.DEFAULT_COOLDOWN_SECONDS)
-
+                logger.warning(
+                    "Failing over request to SECONDARY",
+                    extra={
+                        "reason": type(ex).__name__,
+                        "error": str(ex)
+                    }
+                )
                 return await request_callable(
                     secondary_client,
                     constants.DEPLOYMENT_NAME_SECONDARY
                 )
-
+        logger.info(
+            "Using SECONDARY",
+            extra={"reason": "primary_in_cooldown"}
+        )
         return await request_callable(
             secondary_client,
             constants.DEPLOYMENT_NAME_SECONDARY
         )
-
 
 load_balancer = FailoverLoadBalancer()
