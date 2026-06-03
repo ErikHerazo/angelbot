@@ -38,19 +38,19 @@ def _get_zoho_public_key():
                 _PUBLIC_KEY = serialization.load_pem_public_key(clean.encode())
     return _PUBLIC_KEY
 
-def validate_upload_api_key(x_api_key: str = Header(...)):
-    if x_api_key != API_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API Key inválida"
-        )
+# def validate_upload_api_key(x_api_key: str = Header(...)):
+#     if x_api_key != API_KEY:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="API Key inválida"
+#         )
     
-def validate_upload_api_key_openai(x_api_key: str = Header(...)):
-    if x_api_key != API_KEY_OPENAI:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API Key inválida"
-        )
+# def validate_upload_api_key_openai(x_api_key: str = Header(...)):
+#     if x_api_key != API_KEY_OPENAI:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="API Key inválida"
+#         )
 
 def check_zoho_rsa_signature(signature: str, payload: bytes) -> bool:
     try:
