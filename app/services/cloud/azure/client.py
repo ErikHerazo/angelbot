@@ -1,29 +1,22 @@
 import os
 from app.core import constants
 from openai import AsyncAzureOpenAI
+from dotenv import load_dotenv
 
 
-def get_azure_openai_client() -> AsyncAzureOpenAI:
-    """
-    Creates and returns an Azure OpenAI client configured with the credentials and endpoint specified in the environment variables.
-    Required environment variables:
-    # - AZURE_OPENAI_ENDPOINT_MAIN: URL of the Azure OpenAI resource.
-    - OPENAI_BASE_URL: URL of the APIM.
-    - AZURE_OPENAI_API_KEY_MAIN: API key to authenticate the client.
-    Returns:
-    AsyncAzureOpenAI: Client instance ready to make API calls.
-    """
-    # Obtain the Azure OpenAI endpoint URL from the environment variables
-    endpoint = os.getenv("OPENAI_BASE_URL")
-    
-    # Obtain the API key from the environment variables
-    api_key = os.getenv("API_KEY")
+load_dotenv()
+PRIMARY_KEY=os.getenv("AZURE_OPENAI_API_KEY_MAIN")
 
-    # Create the Azure OpenAI client instance with the desired API version
-    client = AsyncAzureOpenAI(
-        azure_endpoint=endpoint,
-        api_key=api_key,
-        api_version=constants.AZURE_OPENAI_API_VERSION
-    )
+primary_client = AsyncAzureOpenAI(
+    azure_endpoint=constants.BASE_URL,
+    api_key=PRIMARY_KEY,
+    api_version=constants.AZURE_OPENAI_API_VERSION,
+    max_retries=constants.OPENAI_MAX_RETRIES
+)
 
-    return client
+secondary_client = AsyncAzureOpenAI(
+    azure_endpoint=constants.BASE_URL,
+    api_key=PRIMARY_KEY,
+    api_version=constants.AZURE_OPENAI_API_VERSION,
+    max_retries=constants.OPENAI_MAX_RETRIES
+)
