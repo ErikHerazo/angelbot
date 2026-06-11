@@ -28,7 +28,11 @@ def parse_zoho_sales_payload(body: dict) -> ChatEvent:
         user_message = message["text"]
     else:
         user_message = None
-
+    print("HANDLER:", handler)
+    print("VISITOR_ID:", visitor.get("visitor_id"))
+    print("NAME:", visitor.get("name"))
+    print("EMAIL:", visitor.get("email"))
+    print("PHONE:", visitor.get("phone"))
     return ChatEvent(
         source="salesiq",
         event_type=handler,
