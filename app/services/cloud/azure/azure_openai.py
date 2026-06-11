@@ -1,4 +1,3 @@
-import os
 import json
 from dotenv import load_dotenv
 from app.core import constants
@@ -15,7 +14,6 @@ from app.services.cloud.azure.make_completion import make_completion
 from app.services.cloud.azure.token_utils import token_estimate
 from app.services.cloud.azure.azure_language_detector import detect_language_azure
 from app.services.zoho.handle_continue_token import handle_continue_token
-from app.core.utils.validate_supported_language import validate_supported_language
 
 
 load_dotenv()
@@ -28,17 +26,26 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     Compatible with the function calling pattern documented by Azure.
     """
     
-    response = handle_continue_token(user_question, channel)
+    response = await handle_continue_token(session_id=session_id, user_question=user_question, channel= channel)
     if response is not None:
         return response
-    
-    lang = await detect_language_azure(user_question)
-    
-    if error_msg := await validate_supported_language(lang):
-        return error_msg
+
+    logger.info(f"SESSION RAG: {session_id}")
+    lang = await session_memory.get_language(session_id)
+    logger.info(f"🌐 Language from session: {lang}")
 
     if not lang:
-        lang = "es"
+        lang = await detect_language_azure(user_question)
+        logger.info(f"🌐 Detected language: {lang}")
+    
+        if not lang:
+            lang = "es"
+
+        await session_memory.set_language(
+            session_id=session_id,
+            language=lang
+        )
+        logger.info(f"🌐 Saved language in session: {lang}")
 
     # 🧠 Retrieve conversation history
     if channel == "flow":
@@ -55,10 +62,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     logger.debug("History", extra={"history": history})
     
-    if lang not in constants.MAP_ALLOWED_LANG:
-        return "Lo siento, solo puedo comunicarme en inglés, español, ruso y catalán."
-    
-    prompt_user_lang = constants.MAP_ALLOWED_LANG[lang]
+    prompt_user_lang = lang
     rag_query = await translate_text(
         text=user_question,
         from_lang=lang,
