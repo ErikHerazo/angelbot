@@ -43,7 +43,7 @@ async def handle_message(event: ChatEvent):
                 request_id=event.request_id,
                 session_id=session_id,
                 user_question=event.message,
-                channel=event.metadata.get("channel"),
+                channel=channel,
             )
         )
 
