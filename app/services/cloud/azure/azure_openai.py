@@ -14,6 +14,7 @@ from app.services.cloud.azure.make_completion import make_completion
 from app.services.cloud.azure.token_utils import token_estimate
 from app.services.cloud.azure.azure_language_detector import detect_language_azure
 from app.services.zoho.handle_continue_token import handle_continue_token
+from app.core.utils.text_cleaner import get_text_for_language_detection
 
 
 load_dotenv()
@@ -29,14 +30,17 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     response = await handle_continue_token(session_id=session_id, user_question=user_question, channel= channel)
     if response is not None:
         return response
-
+    print(f"🌐 Session ID: {session_id} | User Question: {user_question} | Channel: {channel}")
     logger.info(f"SESSION RAG: {session_id}")
     lang = await session_memory.get_language(session_id)
     logger.info(f"🌐 Language from session: {lang}")
 
     if not lang:
-        lang = await detect_language_azure(user_question)
-        logger.info(f"🌐 Detected language: {lang}")
+        clean_text = get_text_for_language_detection(user_question)
+        print(f"🌐 Clean text for language detection: {clean_text}")
+        if clean_text: 
+            lang = await detect_language_azure(clean_text)
+            logger.info(f"🌐 Detected language: {lang}")
     
         if not lang:
             lang = "es"
