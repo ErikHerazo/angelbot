@@ -2,6 +2,7 @@ import os
 import json
 import redis.asyncio as aioredis
 
+
 class SessionMemoryRedis:
     def __init__(self):
         self.ttl = 900  # 15 minutos por sesión

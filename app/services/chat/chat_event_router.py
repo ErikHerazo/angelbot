@@ -9,7 +9,7 @@ async def route_chat_event(event: ChatEvent):
     try:
         # Chat evnets (SalesIQ)
         if event.event_type == "message":
-            return handle_message(event)
+            return await handle_message(event)
 
         if event.event_type == "trigger":
             return handle_trigger()
