@@ -14,6 +14,7 @@ from app.services.cloud.azure.make_completion import make_completion
 from app.services.cloud.azure.token_utils import token_estimate
 from app.services.cloud.azure.azure_language_detector import detect_language_azure
 from app.services.zoho.handle_continue_token import handle_continue_token
+from app.core.utils.text_cleaner import get_text_for_language_detection
 
 
 load_dotenv()
@@ -25,27 +26,36 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     Execute a conversation with Azure OpenAI using RAG + parallel function calls.
     Compatible with the function calling pattern documented by Azure.
     """
-    
+
     response = await handle_continue_token(session_id=session_id, user_question=user_question, channel= channel)
+
     if response is not None:
         return response
 
-    logger.info(f"SESSION RAG: {session_id}")
+    print(f"🌐 User Question: {user_question}")
+    # logger.info(f"SESSION RAG: {session_id}")
     lang = await session_memory.get_language(session_id)
     logger.info(f"🌐 Language from session: {lang}")
 
     if not lang:
-        lang = await detect_language_azure(user_question)
-        logger.info(f"🌐 Detected language: {lang}")
-    
-        if not lang:
-            lang = "es"
+        clean_text = get_text_for_language_detection(user_question)
+        print(f"🌐 Clean text for language detection: {clean_text}")
 
-        await session_memory.set_language(
-            session_id=session_id,
-            language=lang
-        )
-        logger.info(f"🌐 Saved language in session: {lang}")
+        if clean_text: 
+            lang = await detect_language_azure(clean_text)
+            logger.info(f"🌐 Detected language: {lang}")
+
+            if lang:
+                await session_memory.set_language(
+                    session_id=session_id,
+                    language=lang
+                )
+                logger.info(f"🌐 Saved language in session: {lang}")
+            else:
+                lang = "es"
+        else:
+            lang = "es"
+            logger.info(f"🌐 No clean text for language detection, defaulting to: {lang}")
 
     # 🧠 Retrieve conversation history
     if channel == "flow":
@@ -60,7 +70,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
             "content": constants.INITIAL_ASSISTANT_MESSAGE
         })
 
-    logger.debug("History", extra={"history": history})
+    # logger.debug("History", extra={"history": history})
     
     prompt_user_lang = lang
     rag_query = await translate_text(
@@ -115,7 +125,7 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
                     # print(f"==========🔹 Respuesta de listado de precios:", function_response)
                 else:
                     function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
-
+                    
             except Exception as e:
                 logger.exception(f"💥 Error executing function {function_name}: {e}")
                 function_response = json.dumps({"error": str(e)})
