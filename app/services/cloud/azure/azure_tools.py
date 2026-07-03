@@ -184,7 +184,6 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
             "nota": "💡 Los precios del dataset son referenciales y pueden variar."
         })
 
-
 tools = [
     {
         "type": "function",
@@ -208,35 +207,6 @@ tools = [
                     },
                 },
                 "required": ["input"],
-            },
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "save_user",
-            "description": "Guarda la información de un usuario en la base de datos. "
-                            "Utilízala cuando el usuario proporcione su nombre y correo electrónico "
-                            "para registrarse, dejar sus datos de contacto o continuar una solicitud con un asesor. "
-                            "La función crea la tabla 'users' si no existe y almacena el registro. "
-                            "Devuelve un objeto JSON con el estado de la operación ('status') y un mensaje descriptivo ('message').",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": (
-                            "Nombre del usuario. "
-                        ),
-                    },
-                    "email": {
-                        "type": "string",
-                        "description": (
-                            "Correo electronico del usuario, se usa para que un asesor de atencion al clinete contacte al usuario en horario disponible. "
-                        ),
-                    },
-                },
-                "required": ["name", "email"],
             },
         }
     },
