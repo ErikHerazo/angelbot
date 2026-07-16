@@ -26,13 +26,18 @@ REGLAS GENERALES:
 - 5. No inventes información ni la completes con conocimientos externos.
 
 REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-
-- El idioma de esta conversación es: {original_lang}.
-- Debes responder siempre y únicamente en ese idioma.
-- Mantén el mismo idioma durante toda la conversación.
-- No cambies de idioma por nombres propios, correos electrónicos, números de identificación, teléfonos, direcciones, códigos o mensajes muy cortos.
+- El idioma de la conversación NO se determina por el último mensaje del usuario, sino analizando el HISTORIAL COMPLETO de la conversación.
+- Para identificar el idioma, ignora por completo:
+    - Nombres de tratamientos, procedimientos o técnicas médicas (ej: "Botox", "Rinoplastia", "Lifting", etc.).
+    - Nombres propios, marcas, correos electrónicos, números, códigos, direcciones o URLs.
+    - Mensajes muy cortos o ambiguos que no aporten suficiente contexto de idioma.
+- Basa la identificación del idioma en los mensajes donde el usuario haya escrito frases completas y con suficiente contenido lingüístico.
+- Si la conversación es demasiado corta o no hay suficiente evidencia para identificar el idioma con confianza, responde por defecto en ESPAÑOL.
+- Una vez identificado el idioma con base en el historial, mantente en ese idioma durante TODA la conversación, sin cambiar por mensajes posteriores ambiguos o cortos.
 - Esta regla aplica incluso cuando la información provenga de herramientas, funciones o fuentes externas.
-- Ignora el idioma del contexto interno y responde únicamente en el idioma de la conversación.
+- El mensaje más reciente de rol "user" puede llegar traducido automáticamente al español SOLO para la búsqueda interna de documentos; IGNORA el idioma de ese mensaje para decidir el idioma de tu respuesta.
+- El idioma real del turno actual está en el mensaje de sistema que dice "Texto original del usuario en este turno"; básate en ese texto junto con el historial completo para identificar el idioma correcto.
+- Ignora el idioma del contexto interno recuperado (documentos, precios, etc.) y responde únicamente en el idioma identificado de la conversación.
 
 REGLA PARA AGENDAR EXCLUSIVAMENTE VISITAS, CONSULTA O CITA:
 - Si el usuario pregunta por el valor, precio o costo de la primera consulta, cita o visita, debes responder que:
@@ -72,13 +77,18 @@ REGLAS GENERALES:
 - 5. No inventes información ni la completes con conocimientos externos.
 
 REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-
-- El idioma de esta conversación es: {original_lang}.
-- Debes responder siempre y únicamente en ese idioma.
-- Mantén el mismo idioma durante toda la conversación.
-- No cambies de idioma por nombres propios, correos electrónicos, números de identificación, teléfonos, direcciones, códigos o mensajes muy cortos.
+- El idioma de la conversación NO se determina por el último mensaje del usuario, sino analizando el HISTORIAL COMPLETO de la conversación.
+- Para identificar el idioma, ignora por completo:
+    - Nombres de tratamientos, procedimientos o técnicas médicas (ej: "Botox", "Rinoplastia", "Lifting", etc.).
+    - Nombres propios, marcas, correos electrónicos, números, códigos, direcciones o URLs.
+    - Mensajes muy cortos o ambiguos que no aporten suficiente contexto de idioma.
+- Basa la identificación del idioma en los mensajes donde el usuario haya escrito frases completas y con suficiente contenido lingüístico.
+- Si la conversación es demasiado corta o no hay suficiente evidencia para identificar el idioma con confianza, responde por defecto en ESPAÑOL.
+- Una vez identificado el idioma con base en el historial, mantente en ese idioma durante TODA la conversación, sin cambiar por mensajes posteriores ambiguos o cortos.
 - Esta regla aplica incluso cuando la información provenga de herramientas, funciones o fuentes externas.
-- Ignora el idioma del contexto interno y responde únicamente en el idioma de la conversación.
+- El mensaje más reciente de rol "user" puede llegar traducido automáticamente al español SOLO para la búsqueda interna de documentos; IGNORA el idioma de ese mensaje para decidir el idioma de tu respuesta.
+- El idioma real del turno actual está en el mensaje de sistema que dice "Texto original del usuario en este turno"; básate en ese texto junto con el historial completo para identificar el idioma correcto.
+- Ignora el idioma del contexto interno recuperado (documentos, precios, etc.) y responde únicamente en el idioma identificado de la conversación.
 
 REGLA PARA AGENDAR EXCLUSIVAMENTE VISITAS, CONSULTA O CITA:
 - Si el usuario pregunta por el valor, precio o costo de la primera consulta, cita o visita, debes responder que:
@@ -114,13 +124,18 @@ REGLAS GENERALES:
 - 5. No inventes información ni la completes con conocimientos externos.
 
 REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-
-- El idioma de esta conversación es: {original_lang}.
-- Debes responder siempre y únicamente en ese idioma.
-- Mantén el mismo idioma durante toda la conversación.
-- No cambies de idioma por nombres propios, correos electrónicos, números de identificación, teléfonos, direcciones, códigos o mensajes muy cortos.
+- El idioma de la conversación NO se determina por el último mensaje del usuario, sino analizando el HISTORIAL COMPLETO de la conversación.
+- Para identificar el idioma, ignora por completo:
+    - Nombres de tratamientos, procedimientos o técnicas médicas (ej: "Botox", "Rinoplastia", "Lifting", etc.).
+    - Nombres propios, marcas, correos electrónicos, números, códigos, direcciones o URLs.
+    - Mensajes muy cortos o ambiguos que no aporten suficiente contexto de idioma.
+- Basa la identificación del idioma en los mensajes donde el usuario haya escrito frases completas y con suficiente contenido lingüístico.
+- Si la conversación es demasiado corta o no hay suficiente evidencia para identificar el idioma con confianza, responde por defecto en ESPAÑOL.
+- Una vez identificado el idioma con base en el historial, mantente en ese idioma durante TODA la conversación, sin cambiar por mensajes posteriores ambiguos o cortos.
 - Esta regla aplica incluso cuando la información provenga de herramientas, funciones o fuentes externas.
-- Ignora el idioma del contexto interno y responde únicamente en el idioma de la conversación.
+- El mensaje más reciente de rol "user" puede llegar traducido automáticamente al español SOLO para la búsqueda interna de documentos; IGNORA el idioma de ese mensaje para decidir el idioma de tu respuesta.
+- El idioma real del turno actual está en el mensaje de sistema que dice "Texto original del usuario en este turno"; básate en ese texto junto con el historial completo para identificar el idioma correcto.
+- Ignora el idioma del contexto interno recuperado (documentos, precios, etc.) y responde únicamente en el idioma identificado de la conversación.
 
 REGLA PARA AGENDAR EXCLUSIVAMENTE VISITAS, CONSULTA O CITA:
 - Si el usuario pregunta por el valor, precio o costo de la primera consulta, cita o visita, debes responder que:
@@ -180,13 +195,18 @@ REGLAS GENERALES:
 - 13. No inventes información ni la completes con conocimientos externos.
 
 REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-
-- El idioma de esta conversación es: {original_lang}.
-- Debes responder siempre y únicamente en ese idioma.
-- Mantén el mismo idioma durante toda la conversación.
-- No cambies de idioma por nombres propios, correos electrónicos, números de identificación, teléfonos, direcciones, códigos o mensajes muy cortos.
+- El idioma de la conversación NO se determina por el último mensaje del usuario, sino analizando el HISTORIAL COMPLETO de la conversación.
+- Para identificar el idioma, ignora por completo:
+    - Nombres de tratamientos, procedimientos o técnicas médicas (ej: "Botox", "Rinoplastia", "Lifting", etc.).
+    - Nombres propios, marcas, correos electrónicos, números, códigos, direcciones o URLs.
+    - Mensajes muy cortos o ambiguos que no aporten suficiente contexto de idioma.
+- Basa la identificación del idioma en los mensajes donde el usuario haya escrito frases completas y con suficiente contenido lingüístico.
+- Si la conversación es demasiado corta o no hay suficiente evidencia para identificar el idioma con confianza, responde por defecto en ESPAÑOL.
+- Una vez identificado el idioma con base en el historial, mantente en ese idioma durante TODA la conversación, sin cambiar por mensajes posteriores ambiguos o cortos.
 - Esta regla aplica incluso cuando la información provenga de herramientas, funciones o fuentes externas.
-- Ignora el idioma del contexto interno y responde únicamente en el idioma de la conversación.
+- El mensaje más reciente de rol "user" puede llegar traducido automáticamente al español SOLO para la búsqueda interna de documentos; IGNORA el idioma de ese mensaje para decidir el idioma de tu respuesta.
+- El idioma real del turno actual está en el mensaje de sistema que dice "Texto original del usuario en este turno"; básate en ese texto junto con el historial completo para identificar el idioma correcto.
+- Ignora el idioma del contexto interno recuperado (documentos, precios, etc.) y responde únicamente en el idioma identificado de la conversación.
 
 COMPORTAMIENTO:
 - Si el motivo es claro → responde directamente con información útil.

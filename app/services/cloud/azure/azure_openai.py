@@ -12,9 +12,7 @@ from app.core.utils.get_base_prompt_by_channel import get_base_prompt_by_channel
 
 from app.services.cloud.azure.make_completion import make_completion
 from app.services.cloud.azure.token_utils import token_estimate
-from app.services.cloud.azure.azure_language_detector import detect_language_azure
 from app.services.zoho.handle_continue_token import handle_continue_token
-from app.core.utils.text_cleaner import get_text_for_language_detection
 
 
 load_dotenv()
@@ -34,35 +32,13 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     print(f"🌐 User Question: {user_question}")
     # logger.info(f"SESSION RAG: {session_id}")
-    lang = await session_memory.get_language(session_id)
-    logger.info(f"🌐 Language from session: {lang}")
-
-    if not lang:
-        clean_text = get_text_for_language_detection(user_question)
-        print(f"🌐 Clean text for language detection: {clean_text}")
-
-        if clean_text: 
-            lang = await detect_language_azure(clean_text)
-            logger.info(f"🌐 Detected language: {lang}")
-
-            if lang:
-                await session_memory.set_language(
-                    session_id=session_id,
-                    language=lang
-                )
-                logger.info(f"🌐 Saved language in session: {lang}")
-            else:
-                lang = "es"
-        else:
-            lang = "es"
-            logger.info(f"🌐 No clean text for language detection, defaulting to: {lang}")
 
     # 🧠 Retrieve conversation history
     if channel == "flow":
         history=[]
     else:
         history = await session_memory.get_session(session_id)
-    
+
     # 🔥 INYECTAR MENSAJE INICIAL (SOLO CHAT)
     if channel != "flow" and not history:
         history.append({
@@ -71,20 +47,30 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
         })
 
     # logger.debug("History", extra={"history": history})
-    
-    prompt_user_lang = lang
+
+    # 🌐 El idioma de respuesta ya NO se detecta ni se cachea aquí: el propio
+    # LLM lo infiere analizando el historial completo (ver REGLA DE IDIOMA en
+    # el prompt). Solo traducimos la pregunta a español para la búsqueda en
+    # Azure AI Search (el índice de documentos está en español).
     rag_query = await translate_text(
         text=user_question,
-        from_lang=lang,
         to_lang='es'
     )
 
     # Building the initial context
     base_prompt = get_base_prompt_by_channel(channel)
-    system_prompt = base_prompt.format(original_lang=prompt_user_lang)
-    
+    system_prompt = base_prompt
+
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
+    messages.append({
+        "role": "system",
+        "content": (
+            "Texto original del usuario en este turno, SOLO para identificar el idioma de "
+            "respuesta (no es la consulta de búsqueda ni debes responder a este texto "
+            f"directamente): {user_question}"
+        )
+    })
     messages.append({"role": "user", "content": rag_query})
 
     question_tokens = token_estimate(text=rag_query, model=constants.OPENAI_BASE_MODEL_NAME)
@@ -147,14 +133,6 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
     final_response = await make_completion(messages, max_toks, force_text=True)
     final_message = final_response.choices[0].message
         
-    clean_content = remove_doc_refs(final_message.content)
-    final_answer = clean_content
-
-    if lang != "es":
-        final_answer = await translate_text(
-            text=clean_content,
-            from_lang="es",
-            to_lang=lang
-        )
+    final_answer = remove_doc_refs(final_message.content)
 
     return final_answer

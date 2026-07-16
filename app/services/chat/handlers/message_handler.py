@@ -5,7 +5,7 @@ import uuid
 from app.core import constants
 from app.services.chat.models.event import ChatEvent
 from app.services.chat.zoho_message_processor import process_message_async
-from app.services.cache.session_memory import SessionMemoryRedis
+from app.core.utils.detect_session_language import detect_session_language
 from app.services.cloud.azure.translate_text import translate_text
 
 
@@ -17,9 +17,7 @@ async def handle_message(event: ChatEvent):
 
     # 🚨 BLOQUEO MULTIMEDIA
     if event.message_type == "files":
-        session_memory = SessionMemoryRedis()
-
-        lang = await session_memory.get_language(session_id) or "es"
+        lang = await detect_session_language(session_id)
 
         message = "✅ Archivo subido con éxito."
 
