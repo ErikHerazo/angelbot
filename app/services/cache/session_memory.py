@@ -75,14 +75,3 @@ class SessionMemoryRedis:
         metadata[key] = value
         await self.save_metadata(session_id, metadata)
 
-    async def get_language(self, session_id: str) -> str | None:
-        metadata = await self.get_metadata(session_id)
-        return metadata.get("language")
-
-    async def set_language(self, session_id: str, language: str):
-        await self.update_metadata(
-            session_id=session_id,
-            key="language",
-            value=language
-        )
-        

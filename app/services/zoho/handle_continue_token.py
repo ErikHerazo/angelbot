@@ -1,9 +1,7 @@
 from app.core import constants
-from app.services.cache.session_memory import SessionMemoryRedis
+from app.core.utils.detect_session_language import detect_session_language
 from app.services.cloud.azure.translate_text import translate_text
 
-
-session_memory = SessionMemoryRedis()
 
 async def handle_continue_token(
     session_id: str,
@@ -19,16 +17,15 @@ async def handle_continue_token(
     if channel == "flow":
         return ""
 
-    lang = await session_memory.get_language(session_id)
-    print(f"SESSION CONTINUE: {session_id}")
-    metadata = await session_memory.get_metadata(session_id)
-    print(f"METADATA CONTINUE: {metadata}")
+    # Este mensaje es fijo y no pasa por el LLM, así que su idioma se
+    # detecta al vuelo a partir del historial (sin cachear nada).
+    lang = await detect_session_language(session_id)
     print(f"🌐 Continue token language: {lang}")
 
     # 3. Mensaje fijo en español
     message = constants.RESPONSE_TO_THE_CONTINUE_TOKEN_MESSAGE
 
-    if lang and lang != "es":
+    if lang != "es":
         message = await translate_text(
             text=message,
             from_lang="es",

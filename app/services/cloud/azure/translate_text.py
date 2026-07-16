@@ -10,22 +10,22 @@ AZURE_TRANSLATOR_ENDPOINT = constants.AZURE_TRANSLATOR_ENDPOINT
 AZURE_TRANSLATOR_LOCATION = constants.AZURE_TRANSLATOR_LOCATION
 AZURE_TRANSLATOR_PATH = constants.AZURE_TRANSLATOR_PATH
 
-async def translate_text(text: str, from_lang: str, to_lang: str) -> str:
+async def translate_text(text: str, to_lang: str, from_lang: str | None = None) -> str:
     # 🔹 1. Avoid empty text
     if not text:
         return text
 
     # 🔹 2. Avoid unnecessary translation
-    if from_lang == to_lang:
+    if from_lang and from_lang == to_lang:
         return text
-    
+
     endpoint = AZURE_TRANSLATOR_ENDPOINT
     key = AZURE_TRANSLATOR_API_KEY
     location = AZURE_TRANSLATOR_LOCATION
     path = AZURE_TRANSLATOR_PATH
 
     constructed_url = endpoint + path
-    
+
     headers = {
         "Ocp-Apim-Subscription-Key": key,
         "Ocp-Apim-Subscription-Region": location,
@@ -33,10 +33,10 @@ async def translate_text(text: str, from_lang: str, to_lang: str) -> str:
         "X-ClientTraceId": str(uuid.uuid4())
     }
 
-    params = {
-        "from": from_lang,
-        "to": [to_lang,]
-    }
+    # 🔹 Si no se indica el idioma de origen, Azure lo autodetecta
+    params = {"to": [to_lang,]}
+    if from_lang:
+        params["from"] = from_lang
 
     body = [{
         "text": text
