@@ -9,6 +9,8 @@ from app.services.cache.session_memory import SessionMemoryRedis
 from app.core.utils.text_cleaner import remove_doc_refs
 from app.services.cloud.azure.translate_text import translate_text
 from app.core.utils.get_base_prompt_by_channel import get_base_prompt_by_channel
+from app.core.utils.resolve_reply_language import resolve_reply_language
+from app.core.utils.enforce_reply_language import enforce_reply_language
 
 from app.services.cloud.azure.make_completion import make_completion
 from app.services.cloud.azure.token_utils import token_estimate
@@ -19,13 +21,23 @@ load_dotenv()
 
 session_memory = SessionMemoryRedis()
 
-async def run_conversation_with_rag(session_id: str, user_question: str, channel: str="website"):
+async def run_conversation_with_rag(
+    session_id: str,
+    user_question: str,
+    channel: str = "website",
+    visitor_language: str | None = None,
+):
     """
     Execute a conversation with Azure OpenAI using RAG + parallel function calls.
     Compatible with the function calling pattern documented by Azure.
     """
 
-    response = await handle_continue_token(session_id=session_id, user_question=user_question, channel= channel)
+    response = await handle_continue_token(
+        session_id=session_id,
+        user_question=user_question,
+        channel=channel,
+        visitor_language=visitor_language,
+    )
 
     if response is not None:
         return response
@@ -48,10 +60,23 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     # logger.debug("History", extra={"history": history})
 
-    # 🌐 El idioma de respuesta ya NO se detecta ni se cachea aquí: el propio
-    # LLM lo infiere analizando el historial completo (ver REGLA DE IDIOMA en
-    # el prompt). Solo traducimos la pregunta a español para la búsqueda en
-    # Azure AI Search (el índice de documentos está en español).
+    # 🌐 El idioma de respuesta se resuelve por código (Azure Language
+    # Detector sobre el mensaje/historial, con fallback al idioma declarado
+    # por Zoho) y se inyecta como instrucción directa en el prompt; el LLM
+    # ya no tiene que inferirlo por su cuenta (ver REGLA DE IDIOMA).
+    # Para el canal "flow" el mensaje es un texto sintético en español
+    # (plantilla de campos del formulario), así que no sirve para detectar
+    # idioma: se confía directamente en el idioma declarado por el formulario.
+    reply_lang = await resolve_reply_language(
+        session_id=session_id,
+        current_message=None if channel == "flow" else user_question,
+        language_hint=visitor_language,
+        use_history=(channel != "flow"),
+    )
+    reply_language_label = constants.LANGUAGE_DISPLAY_NAMES.get(reply_lang, reply_lang)
+
+    # Solo traducimos la pregunta a español para la búsqueda en Azure AI
+    # Search (el índice de documentos está en español).
     rag_query = await translate_text(
         text=user_question,
         to_lang='es'
@@ -59,16 +84,16 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
 
     # Building the initial context
     base_prompt = get_base_prompt_by_channel(channel)
-    system_prompt = base_prompt
+    system_prompt = base_prompt.format(reply_language=reply_language_label)
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
     messages.append({
         "role": "system",
         "content": (
-            "Texto original del usuario en este turno, SOLO para identificar el idioma de "
-            "respuesta (no es la consulta de búsqueda ni debes responder a este texto "
-            f"directamente): {user_question}"
+            "Texto original del usuario en este turno (no es la consulta de búsqueda "
+            "ni debes responder a este texto directamente, es solo para que verifiques "
+            f"si pidió explícitamente cambiar de idioma): {user_question}"
         )
     })
     messages.append({"role": "user", "content": rag_query})
@@ -129,10 +154,32 @@ async def run_conversation_with_rag(session_id: str, user_question: str, channel
             "content": response_message.content or "",
         })
 
+    # 🔁 Refuerzo de idioma: los resultados de herramientas suelen venir en
+    # español y pueden hacer que el modelo ignore la instrucción de idioma
+    # del system prompt inicial. Se repite justo antes de la generación
+    # final, que es el punto donde realmente se decide el idioma de salida.
+    messages.append({
+        "role": "system",
+        "content": (
+            f"Recordatorio final: tu respuesta debe estar completamente en "
+            f"{reply_language_label}, incluyendo cualquier precio, nombre de "
+            f"tratamiento o dato que hayas obtenido de las herramientas. No "
+            f"dejes ninguna parte de la respuesta en español a menos que "
+            f"{reply_language_label} sea español."
+        )
+    })
+
     # 🚦 Avoid tool call loops: force textual response
     final_response = await make_completion(messages, max_toks, force_text=True)
     final_message = final_response.choices[0].message
-        
+
     final_answer = remove_doc_refs(final_message.content)
+    print(f"🗣️ Respuesta generada por el LLM (reply_lang esperado: {reply_lang}):\n{final_answer}")
+
+    # 🛡️ Última barrera: si a pesar de todo el LLM respondió en un idioma
+    # distinto al resuelto para este turno, se corrige por código en vez
+    # de confiar en que el modelo lo haya hecho bien.
+    final_answer = await enforce_reply_language(final_answer, reply_lang)
+    print(f"✅ Respuesta final enviada al usuario:\n{final_answer}")
 
     return final_answer

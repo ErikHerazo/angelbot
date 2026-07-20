@@ -19,6 +19,7 @@ async def process_zoho_message(
     user_question: str,
     channel: str,
     rag_runner,
+    visitor_language: str | None = None,
 ):
 
     # 1) Send progress
@@ -26,7 +27,7 @@ async def process_zoho_message(
 
     # 2) Generate answer (RAG)
     try:
-        answer = await rag_runner(session_id, user_question, channel)
+        answer = await rag_runner(session_id, user_question, channel, visitor_language)
         print("===== Respuesta inicial:\n", answer)
         print("===== Longitud aproximada de la respuesta inicial: ", len(answer))
     except Exception:
@@ -52,23 +53,32 @@ async def process_zoho_message(
     
      # 🔥 4) Guardar historial FINAL (lo que realmente ve el usuario)
     if channel != "flow":
-        history = await session_memory.get_session(session_id)
+        try:
+            history = await session_memory.get_session(session_id)
 
-        history.append({
-            "role": "user",
-            "content": user_question
-        })
+            history.append({
+                "role": "user",
+                "content": user_question
+            })
 
-        history.append({
-            "role": "assistant",
-            "content": answer
-        })
+            history.append({
+                "role": "assistant",
+                "content": answer
+            })
 
-        if len(history) > MAX_HISTORY:
-            history = history[-MAX_HISTORY:]
+            if len(history) > MAX_HISTORY:
+                history = history[-MAX_HISTORY:]
 
-        await session_memory.connect()
-        await session_memory.save_session(session_id, history)
+            await session_memory.connect()
+            await session_memory.save_session(session_id, history)
+        except Exception:
+            # Un fallo guardando el historial (ej. Redis caído momentáneamente)
+            # no debe impedir que el usuario reciba la respuesta que ya se
+            # generó; en el peor caso, esa sesión pierde memoria de este turno.
+            logger.exception(
+                "No se pudo guardar el historial de la sesión",
+                extra={"request_id": request_id, "session_id": session_id},
+            )
 
     await zoho_client.send_final_response(
         request_id=request_id,

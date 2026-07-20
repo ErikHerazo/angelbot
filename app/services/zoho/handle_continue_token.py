@@ -1,5 +1,5 @@
 from app.core import constants
-from app.core.utils.detect_session_language import detect_session_language
+from app.core.utils.resolve_reply_language import resolve_reply_language
 from app.services.cloud.azure.translate_text import translate_text
 
 
@@ -7,6 +7,7 @@ async def handle_continue_token(
     session_id: str,
     user_question: str,
     channel: str,
+    visitor_language: str | None = None,
 ) -> str | None:
 
     # 1. Si no es el token, no aplica
@@ -19,7 +20,10 @@ async def handle_continue_token(
 
     # Este mensaje es fijo y no pasa por el LLM, así que su idioma se
     # detecta al vuelo a partir del historial (sin cachear nada).
-    lang = await detect_session_language(session_id)
+    lang = await resolve_reply_language(
+        session_id=session_id,
+        language_hint=visitor_language,
+    )
     print(f"🌐 Continue token language: {lang}")
 
     # 3. Mensaje fijo en español

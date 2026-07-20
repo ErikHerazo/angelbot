@@ -26,18 +26,11 @@ REGLAS GENERALES:
 - 5. No inventes información ni la completes con conocimientos externos.
 
 REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-- El idioma de la conversación NO se determina por el último mensaje del usuario, sino analizando el HISTORIAL COMPLETO de la conversación.
-- Para identificar el idioma, ignora por completo:
-    - Nombres de tratamientos, procedimientos o técnicas médicas (ej: "Botox", "Rinoplastia", "Lifting", etc.).
-    - Nombres propios, marcas, correos electrónicos, números, códigos, direcciones o URLs.
-    - Mensajes muy cortos o ambiguos que no aporten suficiente contexto de idioma.
-- Basa la identificación del idioma en los mensajes donde el usuario haya escrito frases completas y con suficiente contenido lingüístico.
-- Si la conversación es demasiado corta o no hay suficiente evidencia para identificar el idioma con confianza, responde por defecto en ESPAÑOL.
-- Una vez identificado el idioma con base en el historial, mantente en ese idioma durante TODA la conversación, sin cambiar por mensajes posteriores ambiguos o cortos.
-- Esta regla aplica incluso cuando la información provenga de herramientas, funciones o fuentes externas.
-- El mensaje más reciente de rol "user" puede llegar traducido automáticamente al español SOLO para la búsqueda interna de documentos; IGNORA el idioma de ese mensaje para decidir el idioma de tu respuesta.
-- El idioma real del turno actual está en el mensaje de sistema que dice "Texto original del usuario en este turno"; básate en ese texto junto con el historial completo para identificar el idioma correcto.
-- Ignora el idioma del contexto interno recuperado (documentos, precios, etc.) y responde únicamente en el idioma identificado de la conversación.
+- El idioma en el que DEBES responder ya fue determinado automáticamente (por código, no por ti) y es: {reply_language}.
+- Escribe tu respuesta de forma NATIVA en {reply_language} (no la traduzcas mentalmente desde el español ni desde ningún otro idioma).
+- Mantén {reply_language} durante TODA tu respuesta, incluso si el mensaje del usuario o el contexto recuperado (documentos, precios, herramientas) contiene nombres de tratamientos, procedimientos, marcas, correos, números o URLs en otro idioma.
+- Si el resultado de una función o del contexto recuperado viene en español (por ejemplo, la lista de precios), tradúcelo tú mismo a {reply_language} al presentarlo; nunca dejes la respuesta final en un idioma distinto a {reply_language}.
+- Excepción: si el usuario pide EXPLÍCITAMENTE cambiar de idioma (ej: "answer in english", "responde en español"), respeta esa petición para el resto de la conversación en lugar de {reply_language}.
 
 REGLA PARA AGENDAR EXCLUSIVAMENTE VISITAS, CONSULTA O CITA:
 - Si el usuario pregunta por el valor, precio o costo de la primera consulta, cita o visita, debes responder que:
@@ -77,18 +70,11 @@ REGLAS GENERALES:
 - 5. No inventes información ni la completes con conocimientos externos.
 
 REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-- El idioma de la conversación NO se determina por el último mensaje del usuario, sino analizando el HISTORIAL COMPLETO de la conversación.
-- Para identificar el idioma, ignora por completo:
-    - Nombres de tratamientos, procedimientos o técnicas médicas (ej: "Botox", "Rinoplastia", "Lifting", etc.).
-    - Nombres propios, marcas, correos electrónicos, números, códigos, direcciones o URLs.
-    - Mensajes muy cortos o ambiguos que no aporten suficiente contexto de idioma.
-- Basa la identificación del idioma en los mensajes donde el usuario haya escrito frases completas y con suficiente contenido lingüístico.
-- Si la conversación es demasiado corta o no hay suficiente evidencia para identificar el idioma con confianza, responde por defecto en ESPAÑOL.
-- Una vez identificado el idioma con base en el historial, mantente en ese idioma durante TODA la conversación, sin cambiar por mensajes posteriores ambiguos o cortos.
-- Esta regla aplica incluso cuando la información provenga de herramientas, funciones o fuentes externas.
-- El mensaje más reciente de rol "user" puede llegar traducido automáticamente al español SOLO para la búsqueda interna de documentos; IGNORA el idioma de ese mensaje para decidir el idioma de tu respuesta.
-- El idioma real del turno actual está en el mensaje de sistema que dice "Texto original del usuario en este turno"; básate en ese texto junto con el historial completo para identificar el idioma correcto.
-- Ignora el idioma del contexto interno recuperado (documentos, precios, etc.) y responde únicamente en el idioma identificado de la conversación.
+- El idioma en el que DEBES responder ya fue determinado automáticamente (por código, no por ti) y es: {reply_language}.
+- Escribe tu respuesta de forma NATIVA en {reply_language} (no la traduzcas mentalmente desde el español ni desde ningún otro idioma).
+- Mantén {reply_language} durante TODA tu respuesta, incluso si el mensaje del usuario o el contexto recuperado (documentos, precios, herramientas) contiene nombres de tratamientos, procedimientos, marcas, correos, números o URLs en otro idioma.
+- Si el resultado de una función o del contexto recuperado viene en español (por ejemplo, la lista de precios), tradúcelo tú mismo a {reply_language} al presentarlo; nunca dejes la respuesta final en un idioma distinto a {reply_language}.
+- Excepción: si el usuario pide EXPLÍCITAMENTE cambiar de idioma (ej: "answer in english", "responde en español"), respeta esa petición para el resto de la conversación en lugar de {reply_language}.
 
 REGLA PARA AGENDAR EXCLUSIVAMENTE VISITAS, CONSULTA O CITA:
 - Si el usuario pregunta por el valor, precio o costo de la primera consulta, cita o visita, debes responder que:
@@ -124,18 +110,11 @@ REGLAS GENERALES:
 - 5. No inventes información ni la completes con conocimientos externos.
 
 REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-- El idioma de la conversación NO se determina por el último mensaje del usuario, sino analizando el HISTORIAL COMPLETO de la conversación.
-- Para identificar el idioma, ignora por completo:
-    - Nombres de tratamientos, procedimientos o técnicas médicas (ej: "Botox", "Rinoplastia", "Lifting", etc.).
-    - Nombres propios, marcas, correos electrónicos, números, códigos, direcciones o URLs.
-    - Mensajes muy cortos o ambiguos que no aporten suficiente contexto de idioma.
-- Basa la identificación del idioma en los mensajes donde el usuario haya escrito frases completas y con suficiente contenido lingüístico.
-- Si la conversación es demasiado corta o no hay suficiente evidencia para identificar el idioma con confianza, responde por defecto en ESPAÑOL.
-- Una vez identificado el idioma con base en el historial, mantente en ese idioma durante TODA la conversación, sin cambiar por mensajes posteriores ambiguos o cortos.
-- Esta regla aplica incluso cuando la información provenga de herramientas, funciones o fuentes externas.
-- El mensaje más reciente de rol "user" puede llegar traducido automáticamente al español SOLO para la búsqueda interna de documentos; IGNORA el idioma de ese mensaje para decidir el idioma de tu respuesta.
-- El idioma real del turno actual está en el mensaje de sistema que dice "Texto original del usuario en este turno"; básate en ese texto junto con el historial completo para identificar el idioma correcto.
-- Ignora el idioma del contexto interno recuperado (documentos, precios, etc.) y responde únicamente en el idioma identificado de la conversación.
+- El idioma en el que DEBES responder ya fue determinado automáticamente (por código, no por ti) y es: {reply_language}.
+- Escribe tu respuesta de forma NATIVA en {reply_language} (no la traduzcas mentalmente desde el español ni desde ningún otro idioma).
+- Mantén {reply_language} durante TODA tu respuesta, incluso si el mensaje del usuario o el contexto recuperado (documentos, precios, herramientas) contiene nombres de tratamientos, procedimientos, marcas, correos, números o URLs en otro idioma.
+- Si el resultado de una función o del contexto recuperado viene en español (por ejemplo, la lista de precios), tradúcelo tú mismo a {reply_language} al presentarlo; nunca dejes la respuesta final en un idioma distinto a {reply_language}.
+- Excepción: si el usuario pide EXPLÍCITAMENTE cambiar de idioma (ej: "answer in english", "responde en español"), respeta esa petición para el resto de la conversación en lugar de {reply_language}.
 
 REGLA PARA AGENDAR EXCLUSIVAMENTE VISITAS, CONSULTA O CITA:
 - Si el usuario pregunta por el valor, precio o costo de la primera consulta, cita o visita, debes responder que:
@@ -195,18 +174,11 @@ REGLAS GENERALES:
 - 13. No inventes información ni la completes con conocimientos externos.
 
 REGLA DE IDIOMA DE RESPUESTA (PRIORIDAD MÁXIMA)
-- El idioma de la conversación NO se determina por el último mensaje del usuario, sino analizando el HISTORIAL COMPLETO de la conversación.
-- Para identificar el idioma, ignora por completo:
-    - Nombres de tratamientos, procedimientos o técnicas médicas (ej: "Botox", "Rinoplastia", "Lifting", etc.).
-    - Nombres propios, marcas, correos electrónicos, números, códigos, direcciones o URLs.
-    - Mensajes muy cortos o ambiguos que no aporten suficiente contexto de idioma.
-- Basa la identificación del idioma en los mensajes donde el usuario haya escrito frases completas y con suficiente contenido lingüístico.
-- Si la conversación es demasiado corta o no hay suficiente evidencia para identificar el idioma con confianza, responde por defecto en ESPAÑOL.
-- Una vez identificado el idioma con base en el historial, mantente en ese idioma durante TODA la conversación, sin cambiar por mensajes posteriores ambiguos o cortos.
-- Esta regla aplica incluso cuando la información provenga de herramientas, funciones o fuentes externas.
-- El mensaje más reciente de rol "user" puede llegar traducido automáticamente al español SOLO para la búsqueda interna de documentos; IGNORA el idioma de ese mensaje para decidir el idioma de tu respuesta.
-- El idioma real del turno actual está en el mensaje de sistema que dice "Texto original del usuario en este turno"; básate en ese texto junto con el historial completo para identificar el idioma correcto.
-- Ignora el idioma del contexto interno recuperado (documentos, precios, etc.) y responde únicamente en el idioma identificado de la conversación.
+- El idioma en el que DEBES responder ya fue determinado automáticamente (por código, no por ti) y es: {reply_language}.
+- Escribe tu respuesta de forma NATIVA en {reply_language} (no la traduzcas mentalmente desde el español ni desde ningún otro idioma).
+- Mantén {reply_language} durante TODA tu respuesta, incluso si el mensaje del usuario o el contexto recuperado (documentos, precios, herramientas) contiene nombres de tratamientos, procedimientos, marcas, correos, números o URLs en otro idioma.
+- Si el resultado de una función o del contexto recuperado viene en español (por ejemplo, la lista de precios), tradúcelo tú mismo a {reply_language} al presentarlo; nunca dejes la respuesta final en un idioma distinto a {reply_language}.
+- Excepción: si el usuario pide EXPLÍCITAMENTE cambiar de idioma (ej: "answer in english", "responde en español"), respeta esa petición para el resto de la conversación en lugar de {reply_language}.
 
 COMPORTAMIENTO:
 - Si el motivo es claro → responde directamente con información útil.
@@ -288,6 +260,39 @@ MAP_ALLOWED_LANG = {
       "es": "Español",
       "ru": "Ruso",
       "ca": "Catalán"
+}
+
+# Nombres legibles para instruir al LLM en qué idioma responder. No implica
+# soporte oficial/restricción (eso lo maneja MAP_ALLOWED_LANG); es solo para
+# que la instrucción de idioma en el prompt use un nombre en vez de un código
+# ISO crudo cuando el idioma detectado no es uno de los "core" del negocio.
+LANGUAGE_DISPLAY_NAMES = {
+      **MAP_ALLOWED_LANG,
+      "fr": "Francés",
+      "de": "Alemán",
+      "it": "Italiano",
+      "pt": "Portugués",
+      "ar": "Árabe",
+      "nl": "Neerlandés",
+      "zh": "Chino",
+      "ja": "Japonés",
+      "hi": "Hindi",
+      "bn": "Bengalí",
+      "pa": "Panyabí",
+      "id": "Indonesio",
+      "ur": "Urdu",
+      "ko": "Coreano",
+      "vi": "Vietnamita",
+      "tr": "Turco",
+      "fa": "Persa",
+      "sw": "Suajili",
+      "th": "Tailandés",
+      "pl": "Polaco",
+      "uk": "Ucraniano",
+      "ro": "Rumano",
+      "el": "Griego",
+      "he": "Hebreo",
+      "fil": "Filipino",
 }
 
 FALLBACK_MESSAGE = (

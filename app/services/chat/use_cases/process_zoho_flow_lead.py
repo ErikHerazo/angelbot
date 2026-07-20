@@ -57,6 +57,7 @@ async def process_zoho_flow_lead(
             session_id=session_id,
             user_question=user_question,
             channel="flow",
+            visitor_language=lang,
         )
 
         # 5. Retornar a Zoho Flow

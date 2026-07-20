@@ -14,7 +14,13 @@ logger = logging.getLogger(__name__)
 ZOHO_ACCESS_TOKEN = os.getenv("ZOHO_ACCESS_TOKEN")
 zoho_client = ZohoClient(access_token=ZOHO_ACCESS_TOKEN)
 
-async def process_message_async(request_id: str, session_id: str, user_question: str, channel: str):
+async def process_message_async(
+    request_id: str,
+    session_id: str,
+    user_question: str,
+    channel: str,
+    visitor_language: str | None = None,
+):
     try:
         await process_zoho_message(
             zoho_client=zoho_client,
@@ -23,6 +29,7 @@ async def process_message_async(request_id: str, session_id: str, user_question:
             user_question=user_question,
             channel=channel,
             rag_runner=run_conversation_with_rag,
+            visitor_language=visitor_language,
         )
     except Exception as e:
         logger.exception(
