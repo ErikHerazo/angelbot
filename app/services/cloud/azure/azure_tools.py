@@ -184,6 +184,19 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
             "nota": "💡 Los precios del dataset son referenciales y pueden variar."
         })
 
+def flag_revision_or_reintervention_price_request(input: str = "") -> str:
+    """
+    No busca ni calcula ningún precio. Es una señal: el LLM la llama cuando
+    detecta que el usuario ya se sometió antes a una cirugía o tratamiento
+    en la misma zona y ahora pide precio para una revisión/reintervención.
+    El código (azure_openai.py) usa esta llamada para responder de forma
+    determinista en vez de dejar que el LLM improvise un precio, ya que el
+    catálogo de precios solo tiene el valor de la intervención de primera
+    vez, que no aplica a una revisión.
+    """
+    return json.dumps({"acknowledged": True})
+
+
 tools = [
     {
         "type": "function",
@@ -230,6 +243,28 @@ tools = [
                     },
                 },
                 "required": ["name_surgery_or_treatment"],
+            },
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "flag_revision_or_reintervention_price_request",
+            "description": "Llama a esta función, EN VEZ DE `procedures_and_treatments_price_list`, cuando "
+                            "el usuario indica que ya se sometió antes a una cirugía o tratamiento en la misma "
+                            "zona (por ejemplo: ya me operé, cirugía previa, segunda operación, reintervención, "
+                            "revisión, no quedé bien, quiero corregir el resultado, quiero un retoque) Y además "
+                            "está pidiendo el precio, costo, tarifa o presupuesto de esa revisión/reintervención. "
+                            "No inventes ni utilices el precio de la cirugía de primera vez para este caso.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "type": "string",
+                        "description": "Texto del usuario que motivó la detección de reintervención con pregunta de precio.",
+                    },
+                },
+                "required": ["input"],
             },
         }
     }

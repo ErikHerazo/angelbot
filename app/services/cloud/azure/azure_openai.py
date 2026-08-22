@@ -1,5 +1,6 @@
 import json
 from dotenv import load_dotenv
+from openai import BadRequestError
 from app.core import constants
 from app.core.logging_config import logger
 
@@ -49,7 +50,16 @@ async def run_conversation_with_rag(
     if channel == "flow":
         history=[]
     else:
-        history = await session_memory.get_session(session_id)
+        try:
+            history = await session_memory.get_session(session_id)
+        except Exception:
+            # Un fallo transitorio de Redis no debe tumbar la conversación:
+            # se continúa sin historial previo en vez de propagar el error.
+            logger.exception(
+                "No se pudo leer el historial de sesión, se continúa sin él",
+                extra={"session_id": session_id},
+            )
+            history = []
 
     # 🔥 INYECTAR MENSAJE INICIAL (SOLO CHAT)
     if channel != "flow" and not history:
@@ -106,74 +116,119 @@ async def run_conversation_with_rag(
         else int(constants.OPENAI_MAX_TOKENS / 3)
     )
 
-    # 🌀 First call with retry
-    response = await make_completion(messages, max_toks)
-    response_message = response.choices[0].message
+    try:
+        # 🌀 First call with retry
+        response = await make_completion(messages, max_toks)
+        response_message = response.choices[0].message
 
-    # 🚀 Parallel call control (parallel tool calls)
-    if response_message.tool_calls:
-        for tool_call in response_message.tool_calls:
-            function_name = tool_call.function.name
-            try:
-                function_args = json.loads(tool_call.function.arguments)
-            except Exception:
-                logger.warning(f"⚠️ Invalid arguments for {function_name}: {tool_call.function.arguments}")
-                continue
+        # 🚀 Parallel call control (parallel tool calls)
+        revision_price_requested = False
+        if response_message.tool_calls:
+            for tool_call in response_message.tool_calls:
+                function_name = tool_call.function.name
+                try:
+                    function_args = json.loads(tool_call.function.arguments)
+                except Exception:
+                    logger.warning(f"⚠️ Invalid arguments for {function_name}: {tool_call.function.arguments}")
+                    continue
 
-            logger.info(f"🧩 Tool Call: {function_name} | Args: {function_args}")
+                logger.info(f"🧩 Tool Call: {function_name} | Args: {function_args}")
 
-            # Execute corresponding function
-            try:
-                if function_name == "is_customer_service_available":
-                    function_response = azure_tools.is_customer_service_available(
-                        input=function_args.get("input")
-                    )
-                    # print(f"==========🔹 Respuesta is_customer_service_available:", function_response)
-                elif function_name == "procedures_and_treatments_price_list":
-                    function_response = azure_tools.procedures_and_treatments_price_list(
-                        name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
-                    )
-                    # print(f"==========🔹 Respuesta de listado de precios:", function_response)
-                else:
-                    function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
-                    
-            except Exception as e:
-                logger.exception(f"💥 Error executing function {function_name}: {e}")
-                function_response = json.dumps({"error": str(e)})
+                # Execute corresponding function
+                try:
+                    if function_name == "is_customer_service_available":
+                        function_response = azure_tools.is_customer_service_available(
+                            input=function_args.get("input")
+                        )
+                        # print(f"==========🔹 Respuesta is_customer_service_available:", function_response)
+                    elif function_name == "procedures_and_treatments_price_list":
+                        function_response = azure_tools.procedures_and_treatments_price_list(
+                            name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
+                        )
+                        # print(f"==========🔹 Respuesta de listado de precios:", function_response)
+                    elif function_name == "flag_revision_or_reintervention_price_request":
+                        # 🔁 Señal del LLM: ya identificó que es una revisión/
+                        # reintervención con pregunta de precio. El código toma
+                        # el control desde aquí en vez de dejar que el LLM
+                        # improvise un precio (ver REVISION_PRICE_FALLBACK_MESSAGE).
+                        revision_price_requested = True
+                        function_response = azure_tools.flag_revision_or_reintervention_price_request(
+                            input=function_args.get("input")
+                        )
+                    else:
+                        function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 
-            # Record tool response
+                except Exception as e:
+                    logger.exception(f"💥 Error executing function {function_name}: {e}")
+                    function_response = json.dumps({"error": str(e)})
+
+                # Record tool response
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": function_response
+                })
+
+        else:
             messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": function_response
+                "role": response_message.role,
+                "content": response_message.content or "",
             })
 
-    else:
-        messages.append({
-            "role": response_message.role,
-            "content": response_message.content or "",
-        })
+        if revision_price_requested:
+            # 🚧 Caso de reintervención/revisión con pregunta de precio: el
+            # catálogo solo tiene el precio de la cirugía de primera vez, que
+            # no aplica aquí. En vez de confiar en que el LLM lo recuerde en
+            # la generación final (ya se probó que no es confiable), se
+            # responde de forma determinista, sin volver a llamar al LLM.
+            final_answer = await translate_text(
+                text=constants.REVISION_PRICE_FALLBACK_MESSAGE,
+                to_lang=reply_lang,
+                from_lang="es",
+            )
+        else:
+            # 🔁 Refuerzo de idioma: los resultados de herramientas suelen venir
+            # en español y pueden hacer que el modelo ignore la instrucción de
+            # idioma del system prompt inicial. Se repite justo antes de la
+            # generación final, que es el punto donde realmente se decide el
+            # idioma de salida.
+            messages.append({
+                "role": "system",
+                "content": (
+                    f"Recordatorio final: tu respuesta debe estar completamente en "
+                    f"{reply_language_label}, incluyendo cualquier precio, nombre de "
+                    f"tratamiento o dato que hayas obtenido de las herramientas. No "
+                    f"dejes ninguna parte de la respuesta en español a menos que "
+                    f"{reply_language_label} sea español."
+                )
+            })
 
-    # 🔁 Refuerzo de idioma: los resultados de herramientas suelen venir en
-    # español y pueden hacer que el modelo ignore la instrucción de idioma
-    # del system prompt inicial. Se repite justo antes de la generación
-    # final, que es el punto donde realmente se decide el idioma de salida.
-    messages.append({
-        "role": "system",
-        "content": (
-            f"Recordatorio final: tu respuesta debe estar completamente en "
-            f"{reply_language_label}, incluyendo cualquier precio, nombre de "
-            f"tratamiento o dato que hayas obtenido de las herramientas. No "
-            f"dejes ninguna parte de la respuesta en español a menos que "
-            f"{reply_language_label} sea español."
+            # 🚦 Avoid tool call loops: force textual response
+            final_response = await make_completion(messages, max_toks, force_text=True)
+            final_message = final_response.choices[0].message
+
+            final_answer = remove_doc_refs(final_message.content)
+
+    except BadRequestError as ex:
+        error_str = str(ex)
+        if "content_filter" not in error_str and "ResponsibleAIPolicyViolation" not in error_str:
+            raise
+
+        # 🚧 Azure bloqueó la solicitud por su filtro de contenido antes de
+        # generar una respuesta (ej. combinaciones sensibles como menor de
+        # edad + procedimiento de pecho). En vez de dejar que esto caiga en
+        # el fallback genérico en inglés de process_zoho_message.py, se
+        # responde con un mensaje apropiado, traducido al idioma resuelto.
+        logger.warning(
+            "🚧 Azure content filter blocked the request",
+            extra={"session_id": session_id, "error": error_str},
         )
-    })
+        final_answer = await translate_text(
+            text=constants.CONTENT_FILTER_FALLBACK_MESSAGE,
+            to_lang=reply_lang,
+            from_lang="es",
+        )
 
-    # 🚦 Avoid tool call loops: force textual response
-    final_response = await make_completion(messages, max_toks, force_text=True)
-    final_message = final_response.choices[0].message
-
-    final_answer = remove_doc_refs(final_message.content)
     print(f"🗣️ Respuesta generada por el LLM (reply_lang esperado: {reply_lang}):\n{final_answer}")
 
     # 🛡️ Última barrera: si a pesar de todo el LLM respondió en un idioma
