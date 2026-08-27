@@ -9,10 +9,14 @@ from app.services.cloud.azure import azure_tools
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-async def make_completion(messages, max_toks, force_text=False):
+async def make_completion(messages, max_toks, force_text=False, use_data_sources=True):
     """
     Make a call to Azure OpenAI ChatCompletion.
     If `force_text=True`, force tool_choice='none' to prevent further tool calls.
+    If `use_data_sources=False`, skip the "on your data" Azure Search grounding
+    entirely -- para llamadas que no necesitan RAG (ej. redactar una pregunta
+    aclaratoria) y donde el contenido recuperado puede dominar la respuesta por
+    encima de las instrucciones del propio mensaje de sistema.
     """
     async def completion_request(client, deployment):
         # 🔥 LOG DEL MODELO USADO
@@ -22,16 +26,12 @@ async def make_completion(messages, max_toks, force_text=False):
                 "deployment": deployment,
                 "max_tokens": max_toks,
                 "force_text": force_text,
+                "use_data_sources": use_data_sources,
             }
         )
-        return await client.chat.completions.create(
-            model=deployment,
-            messages=messages,
-            tools=azure_tools.tools,
-            tool_choice="none" if force_text else "auto",
-            temperature=constants.OPENAI_TEMPERATURE,
-            max_tokens=max_toks,
-            extra_body={
+        kwargs = {}
+        if use_data_sources:
+            kwargs["extra_body"] = {
                 "data_sources": [
                     {
                         "type": "azure_search",
@@ -55,6 +55,14 @@ async def make_completion(messages, max_toks, force_text=False):
                         },
                     },
                 ]
-            },
+            }
+        return await client.chat.completions.create(
+            model=deployment,
+            messages=messages,
+            tools=azure_tools.tools,
+            tool_choice="none" if force_text else "auto",
+            temperature=constants.OPENAI_TEMPERATURE,
+            max_tokens=max_toks,
+            **kwargs,
         )
     return await load_balancer.execute(completion_request)

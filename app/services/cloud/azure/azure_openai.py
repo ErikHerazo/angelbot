@@ -108,6 +108,13 @@ async def run_conversation_with_rag(
     })
     messages.append({"role": "user", "content": rag_query})
 
+    # 📸 Copia de los mensajes ANTES de la ronda de tool-calls (sin ningún
+    # resultado de precio todavía). Se usa más abajo si hay que cortar por
+    # ambigüedad: permite una respuesta final generada por el LLM (para que
+    # pueda sumar empatía si detecta angustia emocional) sin riesgo de que
+    # filtre un precio, porque esos mensajes nunca llegan a este snapshot.
+    pre_tool_messages = list(messages)
+
     question_tokens = token_estimate(text=rag_query, model=constants.OPENAI_BASE_MODEL_NAME)
     
     max_toks = (
@@ -201,16 +208,53 @@ async def run_conversation_with_rag(
             )
         elif ambiguous_procedure_name:
             # 🚧 Término ambiguo con varias variantes de catálogo (ver más
-            # arriba): se corta el flujo con una pregunta fija en vez de
-            # dejar que el LLM decida qué precio(s) mostrar.
-            final_answer = await translate_text(
-                text=(
-                    f"Existen varios tratamientos relacionados con {ambiguous_procedure_name}. "
-                    "¿Podrías indicarme cuál te interesa exactamente?"
-                ),
-                to_lang=reply_lang,
-                from_lang="es",
-            )
+            # arriba): NO se deja que el LLM vea el resultado real de la
+            # tool (para que nunca pueda filtrar un precio), pero sí se le
+            # pide que redacte la pregunta aclaratoria él mismo, a partir
+            # de los mensajes de ANTES de la ronda de tool-calls
+            # (pre_tool_messages) -- así puede sumar una frase de empatía
+            # si el mensaje del paciente muestra angustia emocional, en vez
+            # de una pregunta fija siempre neutra.
+            clarification_prompt = list(pre_tool_messages)
+            clarification_prompt.append({
+                "role": "system",
+                "content": (
+                    f"CONTEXTO (no es un fallo ni falta de información): el paciente pidió precio de "
+                    f"\"{ambiguous_procedure_name}\", y ese procedimiento SÍ existe y SÍ tiene precio en "
+                    "la clínica, pero tiene varias variantes distintas en el catálogo (por ejemplo, "
+                    "distintas zonas corporales) y todavía no se sabe cuál de ellas quiere el paciente. "
+                    "NO digas que no tienes información, que no está disponible, ni que hay que agendar "
+                    "una valoración para saber el precio -- el único motivo por el que no puedes dar el "
+                    "precio ahora es que falta saber la variante, nada más. Ignora por completo cualquier "
+                    "documento o contexto recuperado sobre este tema para esta respuesta -- no lo "
+                    "necesitas, y no debe influir en si dices o no que falta información. "
+                    "NO menciones ningún precio ni ninguna variante con su precio. "
+                    "Si el mensaje del paciente muestra angustia emocional (ver la regla "
+                    "correspondiente), reconócela brevemente primero, sin reforzar la urgencia ni "
+                    "presentar un tratamiento como solución inmediata. "
+                    f"Tu única tarea en esta respuesta es preguntar, de forma breve y concreta, a cuál "
+                    f"variante de \"{ambiguous_procedure_name}\" se refiere el paciente (por ejemplo, si "
+                    "es una zona corporal, pregunta la zona)."
+                )
+            })
+            try:
+                clarification_response = await make_completion(
+                    clarification_prompt, max_toks, force_text=True, use_data_sources=False
+                )
+                final_answer = remove_doc_refs(clarification_response.choices[0].message.content)
+            except Exception:
+                logger.exception(
+                    "No se pudo generar la pregunta aclaratoria con el LLM, se usa el mensaje fijo",
+                    extra={"session_id": session_id},
+                )
+                final_answer = await translate_text(
+                    text=(
+                        f"Existen varios tratamientos relacionados con {ambiguous_procedure_name}. "
+                        "¿Podrías indicarme cuál te interesa exactamente?"
+                    ),
+                    to_lang=reply_lang,
+                    from_lang="es",
+                )
         else:
             # 🔁 Refuerzo de idioma: los resultados de herramientas suelen venir
             # en español y pueden hacer que el modelo ignore la instrucción de
