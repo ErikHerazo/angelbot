@@ -19,6 +19,7 @@ ENV/
 # Configuración de IDEs
 .vscode/
 .idea/
+*.code-workspace
 
 # Distribuciones
 *.egg-info/

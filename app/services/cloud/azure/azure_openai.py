@@ -123,6 +123,7 @@ async def run_conversation_with_rag(
 
         # 🚀 Parallel call control (parallel tool calls)
         revision_price_requested = False
+        ambiguous_procedure_name = None
         if response_message.tool_calls:
             for tool_call in response_message.tool_calls:
                 function_name = tool_call.function.name
@@ -146,6 +147,18 @@ async def run_conversation_with_rag(
                             name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
                         )
                         # print(f"==========🔹 Respuesta de listado de precios:", function_response)
+                        # 🚧 Si la búsqueda de precios devolvió más de un
+                        # resultado, el término es ambiguo (ej. "liposucción"
+                        # sin zona): el código corta el flujo aquí en vez de
+                        # dejar que el LLM elija o muestre uno o varios
+                        # precios (ya se probó que no es confiable), y
+                        # responde con una pregunta aclaratoria fija.
+                        try:
+                            parsed_response = json.loads(function_response)
+                            if len(parsed_response.get("results", [])) > 1:
+                                ambiguous_procedure_name = function_args.get("name_surgery_or_treatment")
+                        except Exception:
+                            pass
                     elif function_name == "flag_revision_or_reintervention_price_request":
                         # 🔁 Señal del LLM: ya identificó que es una revisión/
                         # reintervención con pregunta de precio. El código toma
@@ -183,6 +196,18 @@ async def run_conversation_with_rag(
             # responde de forma determinista, sin volver a llamar al LLM.
             final_answer = await translate_text(
                 text=constants.REVISION_PRICE_FALLBACK_MESSAGE,
+                to_lang=reply_lang,
+                from_lang="es",
+            )
+        elif ambiguous_procedure_name:
+            # 🚧 Término ambiguo con varias variantes de catálogo (ver más
+            # arriba): se corta el flujo con una pregunta fija en vez de
+            # dejar que el LLM decida qué precio(s) mostrar.
+            final_answer = await translate_text(
+                text=(
+                    f"Existen varios tratamientos relacionados con {ambiguous_procedure_name}. "
+                    "¿Podrías indicarme cuál te interesa exactamente?"
+                ),
                 to_lang=reply_lang,
                 from_lang="es",
             )

@@ -112,10 +112,12 @@ def normalize_text(text: str) -> str:
 
 def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
     """
-    Searches for matching procedures, treatments, and surgeries in the pricing file stored in Azure Blob Storage.
-    The search is case-insensitive, unaffected by accents or special characters, and supports:
-    - Partial matches
-    - Multi-word searches regardless of order.
+    Searches for matching procedures, treatments, and surgeries in the price list
+    index stored in Azure AI Search (not Azure Blob Storage -- the index is queried
+    directly here; Blob Storage is only where the source pricing file was originally
+    uploaded from).
+    The search is case-insensitive, unaffected by accents or special characters, and
+    requires ALL words sent to match (searchMode="all"), regardless of order.
     Returns a JSON string with the results and a note indicating that the prices are for reference only.
     """
 
@@ -143,6 +145,7 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
     
         payload = {
             "search": query_str,
+            "searchMode": "all",
             "count": True
         }
     
@@ -180,7 +183,7 @@ def procedures_and_treatments_price_list(name_surgery_or_treatment: str) -> str:
     except Exception as e:
         logger.error(f"❌ Error en procedures_and_treatments_price_list: {e}")
         return json.dumps({
-            "error": f"Ocurrió un error leyendo el CSV desde Azure Blob: {str(e)}",
+            "error": f"Ocurrió un error consultando el índice de precios en Azure AI Search: {str(e)}",
             "nota": "💡 Los precios del dataset son referenciales y pueden variar."
         })
 
@@ -227,9 +230,10 @@ tools = [
         "type": "function",
         "function": {
             "name": "procedures_and_treatments_price_list",
-            "description":  "Busca coincidencias de procedimientos, tratamientos y cirugías en el archivo de precios "
-                            "almacenado en Azure Blob Storage. La búsqueda es insensible a mayúsculas, acentos y caracteres especiales, "
-                            "y soporta coincidencias parciales y búsqueda por múltiples palabras sin importar el orden. "
+            "description":  "Busca coincidencias de procedimientos, tratamientos y cirugías en el índice de precios "
+                            "de Azure AI Search. La búsqueda es insensible a mayúsculas, acentos y caracteres especiales, "
+                            "y exige que TODAS las palabras enviadas coincidan con el nombre del procedimiento (no basta con que "
+                            "coincida una sola), sin importar el orden en que se envíen. "
                             "Devuelve un string JSON con los resultados encontrados o un mensaje explicativo si no hay coincidencias.",
             "parameters": {
                 "type": "object",
@@ -238,7 +242,11 @@ tools = [
                         "type": "string",
                         "description": (
                             "Nombre de la cirugía o tratamiento que se desea buscar en la lista de precios. "
-                            "Puede ser parcial o contener varias palabras."
+                            "Puede ser parcial (no hace falta el nombre oficial completo, ej. \"liposucción "
+                            "abdomen\" en vez de \"LIPOSUCCION DE ABDOMEN\") y contener varias palabras, pero "
+                            "TODAS las que envíes deben ser parte real del nombre del procedimiento -- una "
+                            "palabra que no lo sea (saludos, verbos, relleno como \"quiero\", \"cuánto cuesta\", "
+                            "\"el precio de\") hace que no se encuentre nada."
                         ),
                     },
                 },
