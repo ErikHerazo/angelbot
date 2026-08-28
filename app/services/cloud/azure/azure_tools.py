@@ -199,6 +199,33 @@ def flag_revision_or_reintervention_price_request(input: str = "") -> str:
     """
     return json.dumps({"acknowledged": True})
 
+def flag_emotional_distress(input: str = "") -> str:
+    """
+    No busca ni calcula nada. Es una señal: el LLM la llama cuando detecta
+    angustia emocional o urgencia subjetiva intensa en el mensaje del
+    paciente (ver DISAMBIGUATION_RULES: ANGUSTIA EMOCIONAL / URGENCIA
+    SUBJETIVA). El código (azure_openai.py) usa esta llamada para generar
+    la respuesta final con un prompt dedicado (EMOTIONAL_DISTRESS_PROMPT)
+    en vez de dejar que el LLM continúe con precio/procedimiento en el
+    mismo turno, que ya se probó que no es confiable.
+    """
+    return json.dumps({"acknowledged": True})
+
+def flag_minor_patient(input: str = "") -> str:
+    """
+    No busca ni calcula nada. Es una señal: el LLM la llama cuando el
+    paciente del que se habla tiene menos de 16 años (edad ya conocida,
+    dicha en este mensaje o en el historial de la conversación) y el
+    mensaje pide precio, recomendación o confirmación de candidatura para
+    un procedimiento estético (ver MINOR_SAFETY_RULE). El código
+    (azure_openai.py) usa esta llamada para generar la respuesta final con
+    un prompt dedicado (MINOR_SAFETY_PROMPT) en vez de dejar que el LLM dé
+    un precio o recomiende un procedimiento directamente -- ya se probó
+    que en una conversación de varios turnos el LLM olvida la restricción
+    de edad del turno anterior y da el precio igual.
+    """
+    return json.dumps({"acknowledged": True})
+
 
 tools = [
     {
@@ -270,6 +297,73 @@ tools = [
                     "input": {
                         "type": "string",
                         "description": "Texto del usuario que motivó la detección de reintervención con pregunta de precio.",
+                    },
+                },
+                "required": ["input"],
+            },
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "flag_emotional_distress",
+            "description": "Llama a esta función, EN VEZ DE continuar normalmente o llamar a "
+                            "`procedures_and_treatments_price_list` u otra tool de precio, SOLO cuando el "
+                            "mensaje del paciente contiene una señal EXPLÍCITA de angustia emocional intensa o "
+                            "urgencia subjetiva, del tipo: 'odio mi...', 'no lo soporto', 'no puedo más con...', "
+                            "'me da asco verme', 'no quiero ni mirarme', 'estoy obsesionado/a con...', 'necesito "
+                            "arreglarlo ya', 'quiero hacer algo ya', 'me está afectando muchísimo', 'no salgo "
+                            "por esto', 'me da vergüenza que me vean', 'llevo todo el día pensando en ello', o "
+                            "una expresión equivalente de rechazo/malestar intenso hacia su aspecto. "
+                            "NO la uses solo porque el paciente describe una condición física, corporal, "
+                            "congénita o médica (por ejemplo, una asimetría o malformación presente desde el "
+                            "nacimiento) -- describir un hecho médico NO es, por sí solo, angustia emocional; "
+                            "responde esos casos con la información médica correspondiente, con normalidad. "
+                            "MUY IMPORTANTE: las palabras 'arreglar'/'arreglarme' SOLAS, sin ir acompañadas de "
+                            "una de las frases explícitas de arriba, NO son señal de angustia emocional -- son "
+                            "una forma neutra y común de pedir un procedimiento. Ejemplo INCORRECTO (NO llamar "
+                            "a esta función): 'quiero arreglarme los labios', 'quiero arreglarme las piernas', "
+                            "'quiero arreglarme la nariz' -- estos son pedidos normales, trátalos con las "
+                            "reglas de desambiguación habituales, sin angustia emocional. Ejemplo CORRECTO (SÍ "
+                            "llamar): 'necesito arreglarlo YA' combinado con otra señal como 'no lo soporto' o "
+                            "'no puedo más' -- ahí la urgencia y el rechazo intenso son la señal, no la palabra "
+                            "'arreglar' por sí sola. "
+                            "Aplica aunque el mismo mensaje también pida precio o mencione un procedimiento -- "
+                            "la angustia emocional tiene prioridad sobre la respuesta comercial, pero solo "
+                            "cuando SÍ hay una señal explícita de angustia.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "type": "string",
+                        "description": "Texto del usuario que motivó la detección de angustia emocional.",
+                    },
+                },
+                "required": ["input"],
+            },
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "flag_minor_patient",
+            "description": "Llama a esta función, EN VEZ DE `procedures_and_treatments_price_list` o de "
+                            "recomendar/confirmar directamente un procedimiento, cuando el paciente del que se "
+                            "habla tiene MENOS DE 16 AÑOS -- edad ya conocida y explícita, dicha en este "
+                            "mensaje o en cualquier mensaje anterior de la misma conversación -- y el mensaje "
+                            "actual pide precio, recomendación o confirmación de candidatura para un "
+                            "procedimiento estético. Aplica también si el motivo parece congénito, "
+                            "reconstructivo, funcional, por accidente, enfermedad o secuela -- en ese caso "
+                            "igual se debe indicar que requiere valoración especializada, sin dar precio ni "
+                            "recomendar directamente. NO uses esta función si todavía no se conoce la edad del "
+                            "menor (en ese caso, pregunta la edad primero, con texto normal, sin llamar a "
+                            "ninguna función).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "type": "string",
+                        "description": "Texto del usuario que motivó la detección de paciente menor de edad.",
                     },
                 },
                 "required": ["input"],

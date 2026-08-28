@@ -131,6 +131,8 @@ async def run_conversation_with_rag(
         # 🚀 Parallel call control (parallel tool calls)
         revision_price_requested = False
         ambiguous_procedure_name = None
+        emotional_distress_detected = False
+        minor_safety_concern = False
         if response_message.tool_calls:
             for tool_call in response_message.tool_calls:
                 function_name = tool_call.function.name
@@ -175,6 +177,30 @@ async def run_conversation_with_rag(
                         function_response = azure_tools.flag_revision_or_reintervention_price_request(
                             input=function_args.get("input")
                         )
+                    elif function_name == "flag_emotional_distress":
+                        # 🔁 Señal del LLM: detectó angustia emocional/urgencia
+                        # subjetiva (ver DISAMBIGUATION_RULES). El código toma
+                        # el control desde aquí -- la regla #9 dice que esto
+                        # tiene prioridad sobre cualquier respuesta comercial,
+                        # así que se ignora cualquier resultado de precio que
+                        # el LLM haya pedido en paralelo en el mismo turno.
+                        emotional_distress_detected = True
+                        function_response = azure_tools.flag_emotional_distress(
+                            input=function_args.get("input")
+                        )
+                    elif function_name == "flag_minor_patient":
+                        # 🔁 Señal del LLM: el paciente del que se habla es
+                        # menor de 16 años (edad ya conocida) y pide precio o
+                        # recomendación de un procedimiento estético. Tiene
+                        # prioridad sobre TODO lo demás -- MINOR_SAFETY_RULE
+                        # es una regla de seguridad global, no de
+                        # desambiguación (ver PRIORIDAD en DISAMBIGUATION_RULES)
+                        # -- así que se ignora cualquier resultado de precio
+                        # que el LLM haya pedido en paralelo en el mismo turno.
+                        minor_safety_concern = True
+                        function_response = azure_tools.flag_minor_patient(
+                            input=function_args.get("input")
+                        )
                     else:
                         function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 
@@ -195,7 +221,62 @@ async def run_conversation_with_rag(
                 "content": response_message.content or "",
             })
 
-        if revision_price_requested:
+        if minor_safety_concern:
+            # 🚧 Paciente menor de edad detectado (ver flag_minor_patient más
+            # arriba): MINOR_SAFETY_RULE es una regla de seguridad global,
+            # tiene prioridad sobre TODO -- angustia emocional, revisión,
+            # ambigüedad de precio -- así que se ignora cualquier resultado
+            # de precio/procedimiento que el LLM haya pedido en paralelo en
+            # el mismo turno. Se genera la respuesta con MINOR_SAFETY_PROMPT
+            # a partir de los mensajes de ANTES de la ronda de tool-calls
+            # (pre_tool_messages, sin ningún precio en el contexto) y sin
+            # data_sources, para que ni el grounding RAG ni un precio ya
+            # obtenido puedan colarse por encima de estas instrucciones.
+            minor_prompt = list(pre_tool_messages)
+            minor_prompt.append({"role": "system", "content": constants.MINOR_SAFETY_PROMPT})
+            try:
+                minor_response = await make_completion(
+                    minor_prompt, max_toks, force_text=True, use_data_sources=False
+                )
+                final_answer = remove_doc_refs(minor_response.choices[0].message.content)
+            except Exception:
+                logger.exception(
+                    "No se pudo generar la respuesta de seguridad de menor con el LLM, se usa el mensaje fijo",
+                    extra={"session_id": session_id},
+                )
+                final_answer = await translate_text(
+                    text=constants.MINOR_SAFETY_FALLBACK_MESSAGE,
+                    to_lang=reply_lang,
+                    from_lang="es",
+                )
+        elif emotional_distress_detected:
+            # 🚧 Angustia emocional detectada (ver flag_emotional_distress
+            # más arriba): tiene prioridad sobre cualquier respuesta
+            # comercial (regla #9), así que se ignora cualquier resultado de
+            # precio/procedimiento que el LLM haya pedido en paralelo en el
+            # mismo turno. Se genera la respuesta con EMOTIONAL_DISTRESS_PROMPT
+            # a partir de los mensajes de ANTES de la ronda de tool-calls
+            # (pre_tool_messages, sin ningún precio en el contexto) y sin
+            # data_sources, para que ni el grounding RAG ni un precio ya
+            # obtenido puedan colarse por encima de estas instrucciones.
+            distress_prompt = list(pre_tool_messages)
+            distress_prompt.append({"role": "system", "content": constants.EMOTIONAL_DISTRESS_PROMPT})
+            try:
+                distress_response = await make_completion(
+                    distress_prompt, max_toks, force_text=True, use_data_sources=False
+                )
+                final_answer = remove_doc_refs(distress_response.choices[0].message.content)
+            except Exception:
+                logger.exception(
+                    "No se pudo generar la respuesta de angustia emocional con el LLM, se usa el mensaje fijo",
+                    extra={"session_id": session_id},
+                )
+                final_answer = await translate_text(
+                    text=constants.EMOTIONAL_DISTRESS_FALLBACK_MESSAGE,
+                    to_lang=reply_lang,
+                    from_lang="es",
+                )
+        elif revision_price_requested:
             # 🚧 Caso de reintervención/revisión con pregunta de precio: el
             # catálogo solo tiene el precio de la cirugía de primera vez, que
             # no aplica aquí. En vez de confiar en que el LLM lo recuerde en

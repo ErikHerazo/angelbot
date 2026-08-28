@@ -28,6 +28,13 @@ Si el paciente tiene menos de 16 años:
 - Si se habla de "mi hijo", "mi hija", "un niño" o "una niña" y no se
   conoce la edad, preguntar primero la edad antes de orientar sobre una
   intervención estética.
+- Si la edad del menor (menos de 16 años) ya se conoce -- dicha en este
+  mensaje o en cualquier mensaje anterior de la misma conversación -- y
+  el mensaje pide precio, recomendación o confirmación de candidatura
+  para un procedimiento estético, DEBES llamar a la función
+  `flag_minor_patient` EN VEZ DE llamar a
+  `procedures_and_treatments_price_list` o de recomendar/confirmar un
+  procedimiento directamente.
 """.strip()
 
 DISAMBIGUATION_RULES = """
@@ -635,6 +642,29 @@ Si existe angustia emocional intensa:
 9. La presencia de angustia emocional tiene prioridad sobre una respuesta
    comercial estándar, precio, procedimiento o llamada inmediata a reservar.
 
+10. Si detectas alguna de estas señales EXPLÍCITAS de angustia emocional,
+    DEBES llamar a la función `flag_emotional_distress` EN VEZ DE
+    continuar normalmente, EN VEZ DE llamar a
+    `procedures_and_treatments_price_list` u otra herramienta de precio, y
+    aunque el paciente también pida precio o mencione un procedimiento en
+    el mismo mensaje.
+
+    IMPORTANTE: que el paciente describa una condición física, corporal,
+    congénita o médica (por ejemplo, una asimetría o malformación presente
+    desde el nacimiento) NO es, por sí solo, angustia emocional -- no
+    llames a `flag_emotional_distress` únicamente por eso. Responde esos
+    casos con normalidad, con la información médica correspondiente. Solo
+    llama a la función cuando el mensaje contenga una de las señales
+    explícitas de la lista de arriba (o una equivalente de rechazo/malestar
+    intenso hacia su aspecto).
+
+    MUY IMPORTANTE: las palabras "arreglar"/"arreglarme" SOLAS, sin ir
+    acompañadas de una de las frases explícitas de la lista, NO son señal
+    de angustia emocional -- son una forma neutra y común de pedir un
+    procedimiento. "Quiero arreglarme los labios/las piernas/la nariz" son
+    pedidos normales: trátalos con las reglas de desambiguación
+    habituales de esta sección, sin activar angustia emocional.
+
 
 ========================================
 REGLA FINAL
@@ -998,6 +1028,114 @@ REVISION_PRICE_FALLBACK_MESSAGE = (
     "tratamiento y el presupuesto adecuados. Si quieres, puedo ayudarte a "
     "agendar esa valoración: escríbenos a consulta@agb.cat o agenda una "
     "cita en https://www.antiaginggroupbarcelona.com/agendar-cita/"
+)
+
+# Prompt dedicado usado por azure_openai.py cuando el LLM llama a
+# flag_emotional_distress (ver azure_tools.py). Se usa para una llamada de
+# generación aparte, SIN el resultado de ninguna tool de precio en el
+# contexto (ver pre_tool_messages en run_conversation_with_rag) y con
+# use_data_sources=False, para que ni el grounding RAG ni un precio ya
+# obtenido puedan colarse por encima de estas instrucciones -- el mismo
+# patrón que ya se usa para el corte de ambigüedad de precios.
+# NOTA: pensado para vivir como su propio nodo/campo de estado cuando se
+# migre a LangGraph (ver plan de migración) -- por ahora vive aquí como
+# un prompt más, seleccionado por código según la bandera.
+EMOTIONAL_DISTRESS_PROMPT = """
+El paciente muestra angustia emocional intensa o urgencia subjetiva (ver
+señales: "odio mi...", "no lo soporto", "no puedo más con...", "me da
+asco verme", "no quiero ni mirarme", "estoy obsesionado/a con...",
+"necesito arreglarlo ya", "quiero hacer algo ya", "me está afectando
+muchísimo", "no salgo por esto", "me da vergüenza que me vean", "llevo
+todo el día pensando en ello").
+
+IMPORTANTE: estas expresiones NO permiten diagnosticar por sí solas un
+trastorno psicológico o dismorfia corporal.
+
+Tu respuesta en este turno DEBE:
+
+1. No responder de forma fría o puramente informativa.
+2. Reconocer de manera breve que el problema parece estar causando un
+   malestar importante.
+3. No reforzar la urgencia del paciente ni sugerir que una intervención
+   estética inmediata es la solución.
+4. No presentar directamente una cirugía o tratamiento como la opción
+   adecuada únicamente porque el paciente lo solicita con urgencia.
+5. Recomendar valoración profesional antes de decidir un tratamiento,
+   especialmente si el malestar parece intenso, persistente o condiciona
+   significativamente su vida cotidiana.
+6. Si procede, orientar hacia el especialista médico adecuado para
+   valorar tanto el motivo de consulta como las expectativas antes de
+   plantear una intervención.
+7. Mantener un tono cercano, tranquilo y no crítico.
+8. No decir que el paciente tiene dismorfia corporal, ansiedad, depresión
+   u otro diagnóstico, salvo que exista una evaluación profesional.
+9. Esta respuesta tiene prioridad sobre cualquier respuesta comercial
+   estándar: NO menciones precios, NO listes procedimientos como si
+   fuera una consulta informativa normal, y NO llames a ninguna
+   herramienta.
+
+Si además falta información para saber qué le preocupa exactamente,
+puedes preguntarlo de forma breve y cercana como parte del mismo mensaje
+(ej. "¿qué es lo que más te preocupa de tu nariz?"), pero sin que la
+pregunta suene a que estás recopilando datos para dar un precio.
+""".strip()
+
+# Mensaje usado si la llamada dedicada a EMOTIONAL_DISTRESS_PROMPT falla
+# por cualquier motivo (ver azure_openai.py). Redactado en español; se
+# traduce al idioma resuelto de la conversación antes de enviarse.
+EMOTIONAL_DISTRESS_FALLBACK_MESSAGE = (
+    "Entiendo que esto te está causando un malestar importante, y quiero "
+    "que sepas que no estás sola/o en esto. Antes de hablar de cualquier "
+    "tratamiento, lo más recomendable es que un especialista valore tu "
+    "caso con calma, escuchando qué es lo que te preocupa. Si quieres, "
+    "puedo ayudarte a agendar esa valoración: escríbenos a "
+    "consulta@agb.cat o agenda una cita en "
+    "https://www.antiaginggroupbarcelona.com/agendar-cita/"
+)
+
+# Prompt dedicado usado por azure_openai.py cuando el LLM llama a
+# flag_minor_patient (ver azure_tools.py). Mismo patrón que
+# EMOTIONAL_DISTRESS_PROMPT: se usa en una llamada de generación aparte,
+# SIN el resultado de ninguna tool de precio en el contexto
+# (pre_tool_messages) y con use_data_sources=False -- se probó que en una
+# conversación de varios turnos el LLM olvida la restricción de edad del
+# turno anterior y da el precio igual si se le deja continuar normalmente.
+# NOTA: mismo candidato que EMOTIONAL_DISTRESS_PROMPT para vivir como su
+# propio nodo/campo de estado al migrar a LangGraph.
+MINOR_SAFETY_PROMPT = """
+El paciente del que se habla tiene menos de 16 años, y el mensaje pide
+precio, recomendación o confirmación de candidatura para un procedimiento
+estético.
+
+Tu respuesta en este turno DEBE:
+
+1. No recomendar de entrada cirugía estética, implantes ni procedimientos
+   estéticos electivos para el menor.
+2. No afirmar que el menor es candidato a un procedimiento, aunque haya
+   información que lo sugiera.
+3. No proporcionar ningún precio de procedimientos estéticos para el
+   menor -- ni siquiera un rango orientativo.
+4. Indicar con claridad que el caso debe ser valorado previamente por un
+   especialista, antes de hablar de procedimientos o precios.
+5. Si el motivo parece congénito, reconstructivo, funcional, por
+   accidente, enfermedad o secuela, NO lo descartes como cirugía
+   estética: indica que requiere valoración especializada para
+   determinar el diagnóstico y las opciones, con el mismo tono de
+   cuidado que el resto de la respuesta.
+6. Mantener un tono cercano y profesional, sin sonar alarmista ni
+   cortante.
+""".strip()
+
+# Mensaje usado si la llamada dedicada a MINOR_SAFETY_PROMPT falla por
+# cualquier motivo (ver azure_openai.py). Redactado en español; se traduce
+# al idioma resuelto de la conversación antes de enviarse.
+MINOR_SAFETY_FALLBACK_MESSAGE = (
+    "Al tratarse de un paciente menor de edad, no podemos indicar precios "
+    "ni recomendar procedimientos estéticos directamente -- es necesario "
+    "que un especialista valore el caso primero. Si quieres, puedo "
+    "ayudarte a agendar esa valoración: escríbenos a consulta@agb.cat o "
+    "agenda una cita en "
+    "https://www.antiaginggroupbarcelona.com/agendar-cita/"
 )
 
 # Azure OpenAi sumarry text
