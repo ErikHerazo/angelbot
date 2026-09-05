@@ -1,5 +1,9 @@
 from typing import Callable, Optional
 
+from app.core.logging.structured_logger import get_logger
+
+log = get_logger(__name__)
+
 
 class LLMReplyCompressionAdapter:
     """Implements ReplyCompressionPort, wrapping generate_compact_answer.
@@ -18,4 +22,7 @@ class LLMReplyCompressionAdapter:
         self._compress_fn = compress_fn
 
     async def compress(self, answer: str, original_question: str) -> str:
-        return await self._compress_fn(answer, original_question)
+        with log.operation(original_length=len(answer)):
+            compressed = await self._compress_fn(answer, original_question)
+            log.debug("Compression finished", compressed_length=len(compressed) if compressed else 0)
+            return compressed

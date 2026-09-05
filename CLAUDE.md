@@ -8,11 +8,12 @@ AngelBot Backend is a FastAPI microservice that powers a multilingual virtual as
 
 ## Commands
 
-There is no test suite, linter, or build step configured (no pytest/ruff/black in `requirements.txt`, no CI config). Files named `test_*.py` under `app/services/**` are standalone manual scripts (no assertions/pytest fixtures) meant to be run directly to sanity-check a connection, e.g.:
+There is no linter or build step configured (no ruff/black in `requirements.txt`, no CI config). A real `pytest` suite exists for the hexagonal migration code (`tests/`, see "Testing" under "Hexagonal architecture migration" below) — nothing else in the repo has automated tests. Files named `test_*.py` under `app/services/**` (and `app/test_hexagonal_chat.py`) are standalone manual scripts (no assertions/pytest fixtures) meant to be run directly to sanity-check a connection or chat interactively, e.g.:
 
 ```bash
 python -m app.services.cache.test_session_memory
 python -m app.services.db.test_connection
+python -m app.test_hexagonal_chat  # chat interactively against the new hexagonal pipeline, bypassing Zoho
 ```
 
 Run the app locally:
@@ -88,7 +89,7 @@ Redis-backed conversation history, keyed `session:{session_id}`, TTL 15 min (900
 
 ### Web/admin routes (`app/web/`)
 
-Separate from the Zoho webhook API: `web/routes/home.py` serves a Jinja2 chat test page (currently broken — it renders `templates/home.html`, which doesn't exist in the repo; only `blob_upload.html` is present), `web/routes/upload_file.py` serves an admin UI + JSON endpoints for browsing Azure Blob containers/prefixes and uploading price-list/document files (validated in `web/utils/file_validators.py` against `constants.ALLOWED_EXTENSIONS`/`ALLOWED_MIME_TYPES`/`MAX_FILE_SIZE_MB`), which then triggers the Celery indexer task. `web/routes/chat_test.py` exposes `POST /web/chat/test`, which calls `run_conversation_with_rag` directly — bypassing Zoho's webhook/signature/payload shape entirely — gated behind a `CHAT_TEST_SECRET` env var (the router 404s if it's unset, and 401s if the request's `X-Test-Secret` header doesn't match), paired with a `CORSMiddleware` in `main.py` enabled only when that secret is set. This exists so an external static test console (see "Environments & test tooling" below) can call the RAG pipeline cross-origin without touching Zoho.
+Separate from the Zoho webhook API: `web/routes/home.py` serves a Jinja2 chat test page (currently broken — it renders `templates/home.html`, which doesn't exist in the repo; only `blob_upload.html` is present), `web/routes/upload_file.py` serves an admin UI + JSON endpoints for browsing Azure Blob containers/prefixes and uploading price-list/document files (validated in `web/utils/file_validators.py` against `constants.ALLOWED_EXTENSIONS`/`ALLOWED_MIME_TYPES`/`MAX_FILE_SIZE_MB`), which then triggers the Celery indexer task. `web/routes/chat_test.py` exposes `POST /web/chat/test`, which calls `run_conversation_with_rag` directly — bypassing Zoho's webhook/signature/payload shape entirely — gated behind a `CHAT_TEST_SECRET` env var (the router 404s if it's unset, and 401s if the request's `X-Test-Secret` header doesn't match), paired with a `CORSMiddleware` in `main.py` enabled only when that secret is set. This exists so an external static test console (see "Environments & test tooling" below) can call the RAG pipeline cross-origin without touching Zoho. `web/routes/chat_test_hexagonal.py` exposes `POST /web/chat/test-hexagonal` alongside it — same request/response contract and secret gate, but runs the message through `ProcessIncomingMessage` (the hexagonal use case) instead of calling `run_conversation_with_rag` directly; see "Hexagonal architecture migration" below for why this exists and how it's wired.
 
 ### Environments & test tooling
 
@@ -178,11 +179,12 @@ One `build_<use_case>()` function per use case, assembling real adapters for a g
 
 ### Production files touched (backward-compatible only)
 
-Two existing production files got a minimal, additive change each — both needed because a use case built this session would otherwise read conversation history from a different Redis key than the tenant-scoped one (`session:{tenant_id}:{session_id}` vs. the legacy `session:{session_id}`), silently breaking multi-turn memory:
-- `services/cloud/azure/azure_openai.py::run_conversation_with_rag` — added optional `history: list | None = None` param; `None` (every current call site) preserves the exact old self-fetch behavior. Later got a second, separate additive param on the same function: `tool_overrides: dict | None = None` (see "Sync/async bridge" below) — still `None` for every current call site, so still zero behavior change in production.
+Three existing production files got a minimal, additive change each:
+- `services/cloud/azure/azure_openai.py::run_conversation_with_rag` — added optional `history: list | None = None` param (needed because a use case built this session would otherwise read conversation history from a different Redis key than the tenant-scoped one, silently breaking multi-turn memory); `None` (every current call site) preserves the exact old self-fetch behavior. Later got two more additive params on the same function, same reasoning (still `None`/unused for every current call site): `tool_overrides: dict | None = None` (see "Sync/async bridge" below) and `base_prompt_override: str | None = None` (see "Prompts..." below).
 - `core/utils/resolve_reply_language.py::resolve_reply_language` — same `history` pattern, same reasoning.
+- `app/main.py` — registers the new `POST /web/chat/test-hexagonal` route (see "Web/admin routes" above). Purely additive: one import, one `include_router` call, no existing route touched.
 
-No other production file has been modified. `app/main.py` and all live routing are untouched.
+No other production file has been modified. All *live* (non-test) routing — the actual Zoho webhook path — is still untouched.
 
 ### Testing
 
@@ -192,12 +194,15 @@ No test suite existed before this migration. Added:
 - `tests/` mirrors `app/`'s structure. Ports are tested with small hand-written fakes (no mocking library needed — they're `Protocol`s). A few adapters are tested against real local infra instead of being faked: `RedisConversationHistoryAdapter` against the real local Redis container (`127.0.0.1:6379`), the `Filesystem*ConfigRepository` adapters against the real `config/tenants/agb/` files.
 - Run: `.venv/bin/pytest tests/ -q`.
 - Known gap: adapters wrapping real paid/networked services with no local equivalent (`ZohoChatPlatformAdapter`, `AzureSearchPriceCatalogAdapter`, `run_conversation_with_rag` itself) aren't exercised against the real service in the automated suite — correctness verified by inspection against the legacy implementation instead. `run_conversation_with_rag` additionally can't even be *imported* locally without stubbing `pyodbc` first (see "Prompt-tuning session status" below) — untouched pre-existing limitation.
+- `app/test_hexagonal_chat.py` — a manual (non-pytest) script, same convention as `app/services/**/test_*.py`, to actually chat against the real `ProcessIncomingMessage` pipeline (real Azure OpenAI, real Redis-backed history, real YAML/Markdown prompt config) from the terminal, bypassing Zoho entirely (a console-printing `ChatPlatformPort` stands in for `ZohoChatPlatformAdapter`). Stubs `pyodbc` the same way the prompt-tuning session did. **Verified for real** with an actual Azure OpenAI call (2026-09-05, "¿cuánto cuesta una rinoplastia?") — `LookupProcedurePrice` found a real catalog match and the LLM answered with the real price, correctly in Spanish. Needs `AZURE_SEARCH_API_KEY_AGB` set (same value as `AZURE_AI_SEARCH_API_KEY`) for that specific tool to run for real; without it, `AzureOpenAIConversationEngineAdapter` now just omits that one tool (see robustness fix below) rather than failing the whole reply.
 
 ### Sync/async bridge for the LLM tools (resolved for 3 of the 5 tools)
 
 `run_conversation_with_rag`'s tool-dispatch loop now accepts an optional `tool_overrides: dict | None = None` param. All 5 tool branches (`is_customer_service_available`, `procedures_and_treatments_price_list`, `flag_revision_or_reintervention_price_request`, `flag_emotional_distress`, `flag_minor_patient`) check for an override before falling back to the legacy sync `azure_tools.X` function — every side effect that reads `function_response` or sets a flag afterward (`revision_price_requested`, `emotional_distress_detected`, `minor_safety_concern`, the price-ambiguity `len(results) > 1` check) is untouched, since both paths produce the same JSON shape.
 
 `AzureOpenAIConversationEngineAdapter` builds `tool_overrides` fresh on every `generate_reply` call (binding that call's `tenant_id`). The 3 flag tools (`flag_revision_or_reintervention_price_request`, `flag_emotional_distress`, `flag_minor_patient`) need no dependencies and are always included unconditionally. `is_customer_service_available` and `procedures_and_treatments_price_list` are the only 2 actually gated behind optional constructor deps (`check_business_availability`, `get_lookup_procedure_price`), because they need tenant-bound state — `check_business_availability` is a plain shared instance (free to construct, no caching needed) while `get_lookup_procedure_price` is an async per-tenant factory (that use case's search adapter needs a secret + config fetch, so rebuilding it per *message* instead of per *tenant* would refetch both on every single chat turn).
+
+**Robustness fix found by actually running it (2026-09-05)**: the first real run of `app/test_hexagonal_chat.py` (before `AZURE_SEARCH_API_KEY_AGB` was set) showed that `get_lookup_procedure_price(tenant_id)` and `prompt_config.get_base_prompt(...)` were both called unguarded — a failure in *either* (e.g. one missing per-tenant secret) aborted `generate_reply` entirely, so every message failed for that tenant, not just price questions. `ProcessIncomingMessage`'s existing fallback caught it (no crash, returned `FALLBACK_MESSAGE`), but that masked a bug that would otherwise silently break an entire tenant's chat over one misconfigured tool. Both calls are now wrapped in their own `try/except`: on failure, logs a `WARNING` and continues — the price tool is simply omitted (`run_conversation_with_rag` falls back to the legacy `azure_tools.py` price lookup) and/or the prompt override stays `None` (falls back to the legacy `constants.py` prompt). One tenant's misconfigured secret/config now degrades one capability instead of blocking every message.
 
 **Per-tenant caching in the composition root**: `_get_or_build_for_tenant(cache_key, tenant_id, builder)` (dict + `asyncio.Lock`, double-checked locking) backs `get_cached_lookup_procedure_price` and `get_cached_chat_platform` — the latter fixing the exact same "rebuilt every message" issue that existed for `ZohoChatPlatformAdapter` in `build_process_incoming_message`, found and fixed at the same time. `build_process_incoming_message`/`build_process_lead_submission` both expose `check_business_availability`/`get_lookup_procedure_price` as overridable params (same reasoning as their other override params — lets tests avoid real secret fetches).
 
@@ -216,6 +221,23 @@ The 4 channel prompts (`WEBSITE_ASSISTANT_PROMPT`, `WHATSAPP_ASSISTANT_PROMPT`, 
 ### `app/config/settings.py` — shared technical config
 
 Closes the last of the 4 config/secrets/constants categories planned early in this migration. Holds values that are shared across all tenants and aren't secrets: `ALLOWED_EXTENSIONS`, `MAX_FILE_SIZE_MB`, `ALLOWED_MIME_TYPES`, `MIN_LANG_DETECTION_LEN`, `INSTAGRAM_CHARACTER_LIMIT`, `FALLBACK_MESSAGE`, `LANGUAGE_DISPLAY_NAMES` — each verified programmatically equal to its `constants.py` counterpart before being treated as migrated. `composition_root.py` reads from here now instead of `constants.py` (safe: it has no production callers yet). `constants.py` itself is untouched, same reasoning as the prompts (see above) — duplication is fine during the not-yet-cut-over window.
+
+### Structured, tagged logging (`app/core/logging/structured_logger.py`)
+
+`get_logger(__name__)` returns a `StructuredLogger` wrapping stdlib `logging`. Tags (an "event type" dimension, separate from severity): `INIT`/`END`/`ERROR` via a context manager, plus standalone `INFO`/`DEBUG`/`WARNING` calls:
+
+```python
+log = get_logger(__name__)
+
+async def execute(self, *, tenant_id, ...):
+    with log.operation(tenant_id=tenant_id):
+        ...  # INIT on entry, END (+ duration_ms) on success, ERROR (+ duration_ms, exception type) on failure -- always re-raises, never swallows
+    log.warning("Redis read failed, continuing without history", session_id=session_id)
+```
+
+The calling function/method name is auto-detected (stack inspection), not passed manually. Structured fields travel via `extra={"structured_fields": {...}}`, namespaced to avoid colliding with reserved `LogRecord` attributes. Console output is human-readable today; `LOG_FORMAT=json` (env var) switches to one JSON object per line with **zero call-site changes** — for when there's a real log aggregator to ship to. `LOG_LEVEL` (env var, default `INFO`) controls the threshold. Each logger sets `propagate = False` so it never double-prints through `app/main.py`'s separate root `logging.basicConfig()` setup (a pre-existing, un-fixed duplication between that and `logging_config.py`'s barely-used `"angelbot"`-named logger — found while building this, not resolved).
+
+Wired into the exact chain `app/test_hexagonal_chat.py` exercises: `ProcessIncomingMessage`, `AzureOpenAIConversationEngineAdapter`, `RedisConversationHistoryAdapter`, `LLMReplyCompressionAdapter`, `CheckBusinessAvailability`, `LookupProcedurePrice`, `ZohoChatPlatformAdapter`, composition root's tenant-scoped cache + `build_process_incoming_message`. Not applied elsewhere yet (rest of the hexagonal code, or any legacy file) — scoped to what's actually being exercised, not a blanket sweep.
 
 ### Known gaps / not yet done
 

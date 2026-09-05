@@ -6,6 +6,7 @@ from app.web.routes import home_router
 from app.api.routes import chat_zoho_router
 from app.web.routes import upload_file_router
 from app.web.routes import chat_test_router
+from app.web.routes import chat_test_hexagonal_router
 from fastapi.staticfiles import StaticFiles
 from app.core import constants
 from app.core.config import Settings
@@ -52,6 +53,7 @@ app.include_router(chat_zoho_router, prefix="/api/chat", tags=["chat_zoho"])
 app.include_router(home_router, prefix="/web/chat", tags=["frontend"])
 app.include_router(upload_file_router, tags=["upload"])
 app.include_router(chat_test_router, prefix="/web/chat", tags=["testing"])
+app.include_router(chat_test_hexagonal_router, prefix="/web/chat", tags=["testing"])
 
 @app.get("/")
 def read_root():

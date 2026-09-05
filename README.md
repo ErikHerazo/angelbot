@@ -66,6 +66,7 @@ No hay linter ni build step configurado. Los archivos `test_*.py` bajo `app/serv
 ```bash
 python -m app.services.cache.test_session_memory
 python -m app.services.db.test_connection
+python -m app.test_hexagonal_chat  # chatea en la terminal contra el pipeline hexagonal nuevo, sin Zoho
 ```
 
 Para el código nuevo de la migración a arquitectura hexagonal (`app/domain/`, `app/application/`, `app/adapters/`) sí hay una suite real con `pytest`:

@@ -2,6 +2,10 @@ import json
 
 import redis.asyncio as aioredis
 
+from app.core.logging.structured_logger import get_logger
+
+log = get_logger(__name__)
+
 
 class RedisConversationHistoryAdapter:
     """Implements ConversationHistoryPort. Connection details are injected —
@@ -23,9 +27,12 @@ class RedisConversationHistoryAdapter:
         return f"session:{tenant_id}:{session_id}"
 
     async def get_history(self, tenant_id: str, session_id: str) -> list[dict]:
-        redis = await self._client()
-        data = await redis.get(self._key(tenant_id, session_id))
-        return json.loads(data) if data else []
+        with log.operation(tenant_id=tenant_id, session_id=session_id):
+            redis = await self._client()
+            data = await redis.get(self._key(tenant_id, session_id))
+            history = json.loads(data) if data else []
+            log.debug("History fetched", turns=len(history))
+            return history
 
     async def append_turn(
         self,
@@ -36,16 +43,18 @@ class RedisConversationHistoryAdapter:
         assistant_message: str,
         max_history: int,
     ) -> None:
-        history = await self.get_history(tenant_id, session_id)
-        history.append({"role": "user", "content": user_message})
-        history.append({"role": "assistant", "content": assistant_message})
+        with log.operation(tenant_id=tenant_id, session_id=session_id, max_history=max_history):
+            history = await self.get_history(tenant_id, session_id)
+            history.append({"role": "user", "content": user_message})
+            history.append({"role": "assistant", "content": assistant_message})
 
-        if len(history) > max_history:
-            history = history[-max_history:]
+            if len(history) > max_history:
+                log.debug("Truncating history to max_history", previous_turns=len(history))
+                history = history[-max_history:]
 
-        redis = await self._client()
-        await redis.set(
-            self._key(tenant_id, session_id),
-            json.dumps(history),
-            ex=self._ttl_seconds,
-        )
+            redis = await self._client()
+            await redis.set(
+                self._key(tenant_id, session_id),
+                json.dumps(history),
+                ex=self._ttl_seconds,
+            )

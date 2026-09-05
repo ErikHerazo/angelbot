@@ -65,6 +65,9 @@ from app.application.use_cases.process_incoming_message import ProcessIncomingMe
 from app.application.use_cases.process_lead_submission import ProcessLeadSubmission
 from app.application.use_cases.upload_knowledge_document import UploadKnowledgeDocument
 from app.config import settings
+from app.core.logging.structured_logger import get_logger
+
+log = get_logger(__name__)
 
 CHANNEL_CHARACTER_LIMITS = {"instagram": settings.INSTAGRAM_CHARACTER_LIMIT}
 STATELESS_CHANNELS = {"flow"}
@@ -96,7 +99,10 @@ async def _get_or_build_for_tenant(cache_key: str, tenant_id: str, builder: Call
     if key not in _tenant_scoped_cache:
         async with _tenant_scoped_cache_lock:
             if key not in _tenant_scoped_cache:
-                _tenant_scoped_cache[key] = await builder()
+                with log.operation(cache_key=cache_key, tenant_id=tenant_id):
+                    _tenant_scoped_cache[key] = await builder()
+    else:
+        log.debug("Tenant-scoped cache hit", cache_key=cache_key, tenant_id=tenant_id)
     return _tenant_scoped_cache[key]
 
 
@@ -151,23 +157,24 @@ async def build_process_incoming_message(
     overridden) are both cached per tenant_id, since this builder runs once
     per incoming chat message.
     """
-    tenant_repository = FilesystemTenantRepository(config_dir=CONFIG_DIR)
-    tenant = await tenant_repository.get_tenant(tenant_id)  # validates config exists
+    with log.operation(tenant_id=tenant_id):
+        tenant_repository = FilesystemTenantRepository(config_dir=CONFIG_DIR)
+        await tenant_repository.get_tenant(tenant_id)  # validates config exists
 
-    if chat_platform is None:
-        chat_platform = await get_cached_chat_platform(tenant_id)
+        if chat_platform is None:
+            chat_platform = await get_cached_chat_platform(tenant_id)
 
-    conversation_history = _build_conversation_history()
+        conversation_history = _build_conversation_history()
 
-    conversation_engine = AzureOpenAIConversationEngineAdapter(
-        conversation_history=conversation_history,
-        rag_runner=rag_runner,
-        check_business_availability=check_business_availability or _check_business_availability,
-        get_lookup_procedure_price=get_lookup_procedure_price or get_cached_lookup_procedure_price,
-        prompt_config=prompt_config or _prompt_config,
-    )
+        conversation_engine = AzureOpenAIConversationEngineAdapter(
+            conversation_history=conversation_history,
+            rag_runner=rag_runner,
+            check_business_availability=check_business_availability or _check_business_availability,
+            get_lookup_procedure_price=get_lookup_procedure_price or get_cached_lookup_procedure_price,
+            prompt_config=prompt_config or _prompt_config,
+        )
 
-    reply_compressor = LLMReplyCompressionAdapter(compress_fn=compress_fn)
+        reply_compressor = LLMReplyCompressionAdapter(compress_fn=compress_fn)
 
     return ProcessIncomingMessage(
         chat_platform=chat_platform,

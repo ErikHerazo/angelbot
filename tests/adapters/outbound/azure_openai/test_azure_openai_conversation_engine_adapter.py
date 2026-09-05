@@ -213,3 +213,54 @@ async def test_fetches_base_prompt_for_tenant_and_channel_when_prompt_config_giv
 
     assert fake_prompt_config.calls == [("agb", "website")]
     assert captured["base_prompt_override"] == "prompt de agb para website"
+
+
+async def test_still_calls_rag_runner_when_lookup_procedure_price_factory_fails():
+    async def failing_factory(tenant_id):
+        raise KeyError("secret not found")
+
+    captured = {}
+
+    async def fake_rag_runner(**kwargs):
+        captured.update(kwargs)
+        return "respuesta a pesar del fallo"
+
+    adapter = AzureOpenAIConversationEngineAdapter(
+        conversation_history=FakeConversationHistory(),
+        rag_runner=fake_rag_runner,
+        get_lookup_procedure_price=failing_factory,
+    )
+
+    answer = await adapter.generate_reply(
+        tenant_id="agb", session_id="sess-1", user_question="hola", channel="website"
+    )
+
+    assert answer == "respuesta a pesar del fallo"
+    assert "procedures_and_treatments_price_list" not in captured["tool_overrides"]
+    # las tools de señal, que no dependen de nada, siguen presentes
+    assert "flag_revision_or_reintervention_price_request" in captured["tool_overrides"]
+
+
+async def test_still_calls_rag_runner_when_prompt_config_fails():
+    class FailingPromptConfig:
+        async def get_base_prompt(self, tenant_id, channel):
+            raise FileNotFoundError("prompt file missing")
+
+    captured = {}
+
+    async def fake_rag_runner(**kwargs):
+        captured.update(kwargs)
+        return "respuesta con prompt legacy"
+
+    adapter = AzureOpenAIConversationEngineAdapter(
+        conversation_history=FakeConversationHistory(),
+        rag_runner=fake_rag_runner,
+        prompt_config=FailingPromptConfig(),
+    )
+
+    answer = await adapter.generate_reply(
+        tenant_id="agb", session_id="sess-1", user_question="hola", channel="website"
+    )
+
+    assert answer == "respuesta con prompt legacy"
+    assert captured["base_prompt_override"] is None
