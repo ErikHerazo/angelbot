@@ -13,6 +13,8 @@ Microservicio FastAPI que impulsa **Aesthea**, el asistente virtual multilingüe
 
 Para el mapa completo de módulos, flujo de datos exacto y decisiones de diseño, ver [`CLAUDE.md`](./CLAUDE.md).
 
+> **En progreso**: migración a arquitectura hexagonal (ports & adapters) con soporte multi-tenant, en la rama `feature/hexagonal-architecture-migration`. Es aditiva — nada de esto reemplaza todavía el flujo descrito arriba, que sigue siendo el que atiende tráfico real. Detalle completo en la sección "Hexagonal architecture migration" de `CLAUDE.md`.
+
 ## Requisitos
 
 - Python 3.13
@@ -59,12 +61,21 @@ celery -A app.tasks.celery worker --loglevel=info
 
 ## Tests
 
-No hay suite de tests, linter ni build step configurado. Los archivos `test_*.py` bajo `app/services/**` son scripts manuales (sin asserts/pytest) para verificar una conexión puntual, pensados para correrse directamente:
+No hay linter ni build step configurado. Los archivos `test_*.py` bajo `app/services/**` son scripts manuales (sin asserts/pytest) para verificar una conexión puntual, pensados para correrse directamente:
 
 ```bash
 python -m app.services.cache.test_session_memory
 python -m app.services.db.test_connection
 ```
+
+Para el código nuevo de la migración a arquitectura hexagonal (`app/domain/`, `app/application/`, `app/adapters/`) sí hay una suite real con `pytest`:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -q
+```
+
+Algunos tests usan el Redis local real (`127.0.0.1:6379`, levantado vía `docker-compose up redis` o similar) en vez de mocks. `requirements-dev.txt` se mantiene fuera de la imagen Docker de producción (ver `.dockerignore`).
 
 ## Estructura del proyecto
 
@@ -80,8 +91,19 @@ app/
 │   └── zoho/            # Cliente de Zoho SalesIQ
 ├── tasks/               # Celery app y tasks (reindexado de Azure Search)
 ├── web/                 # UI de administración (upload de precios) y página de prueba de chat
-└── main.py              # Entry point de FastAPI
+├── main.py              # Entry point de FastAPI (todo lo de arriba es lo que este archivo usa hoy)
+│
+│   # --- migración a hexagonal, en progreso, aditiva, aún no usada por main.py ---
+├── domain/              # Entidades y value objects — puros, sin dependencias de infraestructura
+├── application/         # Casos de uso + puertos (interfaces)
+├── adapters/
+│   ├── inbound/         # Tools del LLM, formatters de respuesta de Zoho
+│   └── outbound/        # Implementaciones concretas: Zoho, Redis, Azure OpenAI/Search/Translator
+├── config/tenants/agb/  # Config de AGB por archivo (fiscal, Zoho, horarios, precios, textos fijos)
+└── composition_root.py  # Arma los casos de uso con adapters reales, por tenant
 ```
+
+Detalle de qué existe hoy en cada carpeta nueva, con qué puertos y con qué queda pendiente: sección "Hexagonal architecture migration" en [`CLAUDE.md`](./CLAUDE.md).
 
 ## Licencia
 

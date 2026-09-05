@@ -1,0 +1,10 @@
+tenant_id: agb
+legal_name: "Cosmetic Surgery BCN SLP"
+trade_name: "Antiaging Group Barcelona"
+address: "Ronda general Mitre 84"
+city: "Barcelona"
+country: "ES"
+tax_id: "B63819130"
+timezone: "Europe/Madrid"
+eu_vat_number: "ESB63819130"
+default_currency: "EUR"

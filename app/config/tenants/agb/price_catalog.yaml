@@ -1,0 +1,2 @@
+search_endpoint: "https://agb-search.search.windows.net"
+index_name: "rag-structured-data-3-large"

@@ -9,6 +9,7 @@ Jinja2==3.1.6
 pyodbc==5.2.0
 holidays==0.82
 azure-identity==1.20.0
+PyYAML==6.0.2
 azure-ai-translation-text==1.0.1
 redis-entraid==1.0.0
 pandas==2.3.3

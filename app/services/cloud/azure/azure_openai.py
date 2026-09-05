@@ -27,6 +27,9 @@ async def run_conversation_with_rag(
     user_question: str,
     channel: str = "website",
     visitor_language: str | None = None,
+    history: list | None = None,
+    tool_overrides: dict | None = None,
+    base_prompt_override: str | None = None,
 ):
     """
     Execute a conversation with Azure OpenAI using RAG + parallel function calls.
@@ -47,19 +50,24 @@ async def run_conversation_with_rag(
     # logger.info(f"SESSION RAG: {session_id}")
 
     # 🧠 Retrieve conversation history
-    if channel == "flow":
-        history=[]
-    else:
-        try:
-            history = await session_memory.get_session(session_id)
-        except Exception:
-            # Un fallo transitorio de Redis no debe tumbar la conversación:
-            # se continúa sin historial previo en vez de propagar el error.
-            logger.exception(
-                "No se pudo leer el historial de sesión, se continúa sin él",
-                extra={"session_id": session_id},
-            )
+    # Si el caller ya trae el historial (ej. el adapter de ConversationEnginePort,
+    # que lo obtiene vía ConversationHistoryPort), se usa tal cual. Si no, se
+    # conserva el comportamiento legacy de leerlo aquí mismo -- necesario para
+    # que el flujo de producción actual (que no pasa `history`) no cambie.
+    if history is None:
+        if channel == "flow":
             history = []
+        else:
+            try:
+                history = await session_memory.get_session(session_id)
+            except Exception:
+                # Un fallo transitorio de Redis no debe tumbar la conversación:
+                # se continúa sin historial previo en vez de propagar el error.
+                logger.exception(
+                    "No se pudo leer el historial de sesión, se continúa sin él",
+                    extra={"session_id": session_id},
+                )
+                history = []
 
     # 🔥 INYECTAR MENSAJE INICIAL (SOLO CHAT)
     if channel != "flow" and not history:
@@ -93,7 +101,10 @@ async def run_conversation_with_rag(
     )
 
     # Building the initial context
-    base_prompt = get_base_prompt_by_channel(channel)
+    # Si el caller ya trae el prompt (ej. el adapter de ConversationEnginePort,
+    # que lo obtiene vía PromptConfigRepositoryPort), se usa tal cual. Si no,
+    # se conserva el comportamiento legacy de leerlo desde constants.py.
+    base_prompt = base_prompt_override if base_prompt_override is not None else get_base_prompt_by_channel(channel)
     system_prompt = base_prompt.format(reply_language=reply_language_label)
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -147,14 +158,29 @@ async def run_conversation_with_rag(
                 # Execute corresponding function
                 try:
                     if function_name == "is_customer_service_available":
-                        function_response = azure_tools.is_customer_service_available(
-                            input=function_args.get("input")
-                        )
+                        # 🔀 Si hay un override hexagonal para esta tool (ver
+                        # ConversationEnginePort/AzureOpenAIConversationEngineAdapter),
+                        # se usa en vez del azure_tools.py legacy -- el resto
+                        # de la lógica de este bloque no cambia porque ambos
+                        # devuelven el mismo formato de JSON.
+                        if tool_overrides and "is_customer_service_available" in tool_overrides:
+                            function_response = await tool_overrides["is_customer_service_available"](
+                                input=function_args.get("input")
+                            )
+                        else:
+                            function_response = azure_tools.is_customer_service_available(
+                                input=function_args.get("input")
+                            )
                         # print(f"==========🔹 Respuesta is_customer_service_available:", function_response)
                     elif function_name == "procedures_and_treatments_price_list":
-                        function_response = azure_tools.procedures_and_treatments_price_list(
-                            name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
-                        )
+                        if tool_overrides and "procedures_and_treatments_price_list" in tool_overrides:
+                            function_response = await tool_overrides["procedures_and_treatments_price_list"](
+                                name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
+                            )
+                        else:
+                            function_response = azure_tools.procedures_and_treatments_price_list(
+                                name_surgery_or_treatment=function_args.get("name_surgery_or_treatment"),
+                            )
                         # print(f"==========🔹 Respuesta de listado de precios:", function_response)
                         # 🚧 Si la búsqueda de precios devolvió más de un
                         # resultado, el término es ambiguo (ej. "liposucción"
@@ -174,9 +200,14 @@ async def run_conversation_with_rag(
                         # el control desde aquí en vez de dejar que el LLM
                         # improvise un precio (ver REVISION_PRICE_FALLBACK_MESSAGE).
                         revision_price_requested = True
-                        function_response = azure_tools.flag_revision_or_reintervention_price_request(
-                            input=function_args.get("input")
-                        )
+                        if tool_overrides and "flag_revision_or_reintervention_price_request" in tool_overrides:
+                            function_response = await tool_overrides["flag_revision_or_reintervention_price_request"](
+                                input=function_args.get("input")
+                            )
+                        else:
+                            function_response = azure_tools.flag_revision_or_reintervention_price_request(
+                                input=function_args.get("input")
+                            )
                     elif function_name == "flag_emotional_distress":
                         # 🔁 Señal del LLM: detectó angustia emocional/urgencia
                         # subjetiva (ver DISAMBIGUATION_RULES). El código toma
@@ -185,9 +216,14 @@ async def run_conversation_with_rag(
                         # así que se ignora cualquier resultado de precio que
                         # el LLM haya pedido en paralelo en el mismo turno.
                         emotional_distress_detected = True
-                        function_response = azure_tools.flag_emotional_distress(
-                            input=function_args.get("input")
-                        )
+                        if tool_overrides and "flag_emotional_distress" in tool_overrides:
+                            function_response = await tool_overrides["flag_emotional_distress"](
+                                input=function_args.get("input")
+                            )
+                        else:
+                            function_response = azure_tools.flag_emotional_distress(
+                                input=function_args.get("input")
+                            )
                     elif function_name == "flag_minor_patient":
                         # 🔁 Señal del LLM: el paciente del que se habla es
                         # menor de 16 años (edad ya conocida) y pide precio o
@@ -198,9 +234,14 @@ async def run_conversation_with_rag(
                         # -- así que se ignora cualquier resultado de precio
                         # que el LLM haya pedido en paralelo en el mismo turno.
                         minor_safety_concern = True
-                        function_response = azure_tools.flag_minor_patient(
-                            input=function_args.get("input")
-                        )
+                        if tool_overrides and "flag_minor_patient" in tool_overrides:
+                            function_response = await tool_overrides["flag_minor_patient"](
+                                input=function_args.get("input")
+                            )
+                        else:
+                            function_response = azure_tools.flag_minor_patient(
+                                input=function_args.get("input")
+                            )
                     else:
                         function_response = json.dumps({"error": f"Función desconocida: {function_name}"})
 

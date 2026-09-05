@@ -1,3 +1,28 @@
 .git*
 **/*.pyc
+**/__pycache__/
 .venv/
+venv/
+env/
+ENV/
+
+# Secrets (docker-compose injects .env at runtime via env_file; never bake it into the image)
+.env
+!.env.example
+
+# Test tooling — not needed at runtime
+tests/
+.pytest_cache/
+conftest.py
+pytest.ini
+requirements-dev.txt
+
+# IDE / OS / logs
+.vscode/
+.idea/
+*.log
+.DS_Store
+
+# Coverage
+htmlcov/
+.coverage

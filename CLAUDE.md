@@ -114,6 +114,115 @@ Two Azure Container Apps run in the `Angelbot_rg` resource group (subscription "
 - `services/zoho/handle_continue_token.py` — intercepts the "continue" sentinel described above.
 - Webhook auth is source-specific: SalesIQ uses RSA-SHA256 signature verification against a public key in `SIGNATURE_WEBHOOK_ZOHOSALESIQ` (and re-injects the consumed request body so downstream `request.json()`-style parsing still works); Flow uses a shared-secret HMAC comparison (`FLOW_WEBHOOK_SECRET`).
 
+## Hexagonal architecture migration (in progress, branch `feature/hexagonal-architecture-migration`)
+
+Since 2026-09-05 this codebase is being incrementally migrated to **hexagonal architecture (ports & adapters)** with multi-tenant support, living alongside everything described above. **Everything in this section is additive**: nothing here is wired into `app/main.py` or live routing yet — the architecture described in the rest of this document is what actually serves Zoho traffic today. Treat this section as the map of a parallel, not-yet-cut-over implementation.
+
+### Why
+
+Two goals: (1) decouple business logic from Zoho/Azure/Redis specifics via ports/adapters, so swapping any of them (e.g. a client on WhatsApp instead of Zoho, or the planned Redis provider change) is an adapter swap, not a rewrite; (2) make the codebase genuinely multi-tenant — today everything is hardcoded to Antiaging Group Barcelona (AGB). This is separate from, but reconciled with, the earlier LangGraph/LangChain migration effort: when that happens (AI/conversation-generation only), it will become the adapter behind `ConversationEnginePort` below — no other port or use case changes for it.
+
+### Folder structure
+
+```
+app/
+  domain/              # entities/value objects — shared across all tenants, framework-free
+    entities/tenant.py                    # Tenant (fiscal/business identity + subscription fields)
+    value_objects/business_hours.py       # BusinessHoursWindow, BusinessHoursSchedule, is_within_business_hours (pure)
+    value_objects/procedure_price.py      # ProcedureMatch, ProcedurePriceResult, normalize_search_text (pure)
+  application/         # use cases + ports — shared across all tenants
+    ports/             # Protocol interfaces implemented by adapters
+    use_cases/
+  adapters/
+    inbound/           # things that drive the app: LLM tool wrappers, Zoho response formatters
+      llm_tools/
+      zoho/
+    outbound/          # things the app drives: Zoho HTTP, Redis, Azure OpenAI/Search/Translator, config/secrets readers
+  config/
+    tenants/
+      agb/             # AGB's config data files (see below) — one file per concern, not one big blob
+  composition_root.py  # wires concrete adapters into use cases, per tenant
+```
+
+`adapters/in/`/`adapters/out/` would break (`in` is a reserved Python keyword) — always `inbound`/`outbound`.
+
+### Use cases built so far
+
+| Use case | File | Ports it depends on |
+|---|---|---|
+| `ProcessIncomingMessage` | `application/use_cases/process_incoming_message.py` | `ChatPlatformPort`, `ConversationEnginePort`, `ConversationHistoryPort`, `ReplyCompressionPort` |
+| `CheckBusinessAvailability` | `application/use_cases/check_business_availability.py` | `TenantRepositoryPort`, `BusinessHoursConfigRepositoryPort`, `ClockPort` |
+| `LookupProcedurePrice` | `application/use_cases/lookup_procedure_price.py` | `TenantRepositoryPort`, `PriceCatalogSearchPort` |
+| `HandleGreetingTrigger` | `application/use_cases/handle_greeting_trigger.py` | `GreetingConfigRepositoryPort` |
+| `InterceptContinuationToken` | `application/use_cases/intercept_continuation_token.py` | `ReplyLanguageResolverPort`, `TranslationPort`, `ContinueMessageConfigRepositoryPort` |
+| `AcknowledgeFileUpload` | `application/use_cases/acknowledge_file_upload.py` | `ReplyLanguageResolverPort`, `TranslationPort`, `FileUploadAckConfigRepositoryPort` |
+| `ProcessLeadSubmission` | `application/use_cases/process_lead_submission.py` | `ConversationEnginePort` (reused, no new port) |
+| `UploadKnowledgeDocument` | `application/use_cases/upload_knowledge_document.py` | `BlobStoragePort`, `SearchIndexerTriggerPort` |
+| `IndexKnowledgeDocument` | `application/use_cases/index_knowledge_document.py` | `SearchIndexerControlPort` (distinct from `SearchIndexerTriggerPort` — that one enqueues the Celery job, this one is what runs inside it) |
+
+`flag_revision_or_reintervention_price_request` deliberately got **no** use case — it's a pure LLM signal with no business rule behind it (see `adapters/inbound/llm_tools/flag_revision_or_reintervention_price_request_tool.py`); the real behavior lives in `azure_openai.py`'s orchestration, not decomposed yet.
+
+This covers the full original 14-item use-case list identified at the start of the migration. `flag_emotional_distress` and `flag_minor_patient` (`adapters/inbound/llm_tools/`) were added afterward, same pure-signal shape as `flag_revision_or_reintervention_price_request` — all 5 tools from `azure_tools.py` now have hexagonal equivalents. Not built, deliberately: `GenerateConversationalReply`'s internal decomposition (see below).
+
+Every outbound adapter that's tenant-specific config (Zoho screenname/server_uri, business hours, price-catalog index, greeting text, continue-token message, file-upload ack message, search indexer name) reads from its own file under `config/tenants/{tenant_id}/` — one concern per file (`tenant.yaml`, `zoho.yaml`, `business_hours.yaml`, `price_catalog.yaml`, `search_indexer.yaml`, `greeting.txt`, `continue_message.txt`, `file_upload_ack_message.txt`), deliberately not consolidated into one config blob. Secrets (Zoho access token, Azure AI Search API key, Azure Blob connection string) go through `SecretsPort` (`EnvFileSecretsAdapter` today, keyed as `zoho-access-token-{tenant_id}` / `azure-search-api-key-{tenant_id}` / `azure-blob-connection-string-{tenant_id}`), never through the YAML files.
+
+**Dead/broken legacy code found while porting** (flagged, left untouched — not asked to clean it up): `services/chat/zoho_flow_processor.py::process_flow_lead_async` is never called (the real path is `flow_handler.py::handle_flow_lead` → `process_zoho_flow_lead` directly) and calls that function with a `zoho_client` kwarg it doesn't accept — would `TypeError` if it ever ran. `web/utils/file_validators.py::sanitize_filename` is defined but never called either.
+
+**Blocking-I/O fixes, three so far, two different techniques**: `LookupProcedurePrice`'s Azure Search call (`requests`→`httpx`, since `httpx` was already a dependency) vs. `UploadKnowledgeDocument`'s Azure Blob calls and `IndexKnowledgeDocument`'s Azure Search indexer calls (both wrapped in `asyncio.to_thread` instead, since their async SDK variants need `aiohttp`, confirmed not installed, and adding it just for this wasn't judged worth a new dependency).
+
+`Tenant.country` is an ISO 3166-1 alpha-2 code (`"ES"`), not a display name — needed as-is by the `holidays` library in `CheckBusinessAvailability`.
+
+### Composition root (`app/composition_root.py`)
+
+One `build_<use_case>()` function per use case, assembling real adapters for a given `tenant_id`. Several accept override params (`chat_platform`, `rag_runner`, `compress_fn`) so tests can substitute fakes for the pieces that would otherwise hit real Zoho/Azure OpenAI over the network. `CONFIG_DIR` points at `app/config/tenants`.
+
+### Production files touched (backward-compatible only)
+
+Two existing production files got a minimal, additive change each — both needed because a use case built this session would otherwise read conversation history from a different Redis key than the tenant-scoped one (`session:{tenant_id}:{session_id}` vs. the legacy `session:{session_id}`), silently breaking multi-turn memory:
+- `services/cloud/azure/azure_openai.py::run_conversation_with_rag` — added optional `history: list | None = None` param; `None` (every current call site) preserves the exact old self-fetch behavior. Later got a second, separate additive param on the same function: `tool_overrides: dict | None = None` (see "Sync/async bridge" below) — still `None` for every current call site, so still zero behavior change in production.
+- `core/utils/resolve_reply_language.py::resolve_reply_language` — same `history` pattern, same reasoning.
+
+No other production file has been modified. `app/main.py` and all live routing are untouched.
+
+### Testing
+
+No test suite existed before this migration. Added:
+- `requirements-dev.txt` (`-r requirements.txt` + `pytest`, `pytest-asyncio`) — kept separate from `requirements.txt`, not installed in the production Docker image (`.dockerignore` excludes `tests/`, `pytest.ini`, `conftest.py`, `requirements-dev.txt`).
+- `pytest.ini` (`asyncio_mode = auto`) + root `conftest.py` (empty — needed so `app/`, which has no `app/__init__.py`, resolves on `sys.path` during test collection).
+- `tests/` mirrors `app/`'s structure. Ports are tested with small hand-written fakes (no mocking library needed — they're `Protocol`s). A few adapters are tested against real local infra instead of being faked: `RedisConversationHistoryAdapter` against the real local Redis container (`127.0.0.1:6379`), the `Filesystem*ConfigRepository` adapters against the real `config/tenants/agb/` files.
+- Run: `.venv/bin/pytest tests/ -q`.
+- Known gap: adapters wrapping real paid/networked services with no local equivalent (`ZohoChatPlatformAdapter`, `AzureSearchPriceCatalogAdapter`, `run_conversation_with_rag` itself) aren't exercised against the real service in the automated suite — correctness verified by inspection against the legacy implementation instead. `run_conversation_with_rag` additionally can't even be *imported* locally without stubbing `pyodbc` first (see "Prompt-tuning session status" below) — untouched pre-existing limitation.
+
+### Sync/async bridge for the LLM tools (resolved for 3 of the 5 tools)
+
+`run_conversation_with_rag`'s tool-dispatch loop now accepts an optional `tool_overrides: dict | None = None` param. All 5 tool branches (`is_customer_service_available`, `procedures_and_treatments_price_list`, `flag_revision_or_reintervention_price_request`, `flag_emotional_distress`, `flag_minor_patient`) check for an override before falling back to the legacy sync `azure_tools.X` function — every side effect that reads `function_response` or sets a flag afterward (`revision_price_requested`, `emotional_distress_detected`, `minor_safety_concern`, the price-ambiguity `len(results) > 1` check) is untouched, since both paths produce the same JSON shape.
+
+`AzureOpenAIConversationEngineAdapter` builds `tool_overrides` fresh on every `generate_reply` call (binding that call's `tenant_id`). The 3 flag tools (`flag_revision_or_reintervention_price_request`, `flag_emotional_distress`, `flag_minor_patient`) need no dependencies and are always included unconditionally. `is_customer_service_available` and `procedures_and_treatments_price_list` are the only 2 actually gated behind optional constructor deps (`check_business_availability`, `get_lookup_procedure_price`), because they need tenant-bound state — `check_business_availability` is a plain shared instance (free to construct, no caching needed) while `get_lookup_procedure_price` is an async per-tenant factory (that use case's search adapter needs a secret + config fetch, so rebuilding it per *message* instead of per *tenant* would refetch both on every single chat turn).
+
+**Per-tenant caching in the composition root**: `_get_or_build_for_tenant(cache_key, tenant_id, builder)` (dict + `asyncio.Lock`, double-checked locking) backs `get_cached_lookup_procedure_price` and `get_cached_chat_platform` — the latter fixing the exact same "rebuilt every message" issue that existed for `ZohoChatPlatformAdapter` in `build_process_incoming_message`, found and fixed at the same time. `build_process_incoming_message`/`build_process_lead_submission` both expose `check_business_availability`/`get_lookup_procedure_price` as overridable params (same reasoning as their other override params — lets tests avoid real secret fetches).
+
+### Prompts and disambiguation/safety rules moved to per-tenant config
+
+The 4 channel prompts (`WEBSITE_ASSISTANT_PROMPT`, `WHATSAPP_ASSISTANT_PROMPT`, `INSTAGRAM_ASSISTANT_PROMPT`, `FLOW_FORM_ASSISTANT_PROMPT`) and `MINOR_SAFETY_RULE`/`DISAMBIGUATION_RULES` now also live as data files under `config/tenants/agb/prompts/`, extracted verbatim from `constants.py`. **Split by file format, deliberately not uniform** (researched against 2026 community practice, not guessed):
+- Channel prompts → **YAML** (`website.yaml`, `whatsapp.yaml`, `instagram.yaml`, `flow.yaml`, each a `template:` key) — engineering-owned prompt-engineering artifacts; YAML is the current production standard for prompt storage, and specifically what LangChain's native `load_prompt` expects, which matters given the planned LangChain/LangGraph migration of the RAG engine.
+- The two rule blocks → **Markdown** (`minor_safety_rule.md`, `disambiguation_rules.md`) — business/legal-owned content (sourced externally as plain text today), where YAML's quoting/escaping rules would be a hazard for a non-technical editor; Markdown has none of that.
+
+`FilesystemPromptConfigRepository` (`PromptConfigRepositoryPort`) reads the channel YAML plus both `.md` rule files and does the same `<<MINOR_SAFETY_RULE>>`/`<<DISAMBIGUATION_RULES>>` substitution `constants.py` does at import time — `{reply_language}` is left in place for `run_conversation_with_rag` to `.format()` per turn, same as today.
+
+`run_conversation_with_rag` accepts an optional `base_prompt_override: str | None = None` (same additive pattern as `history`/`tool_overrides`) — `None` (every current call site) preserves the exact legacy `get_base_prompt_by_channel(channel)` behavior. `AzureOpenAIConversationEngineAdapter` fetches this fresh per call via an optional `prompt_config` dependency when given (not cached — it's a local file read, cheap enough to redo every turn, unlike the price-lookup tool's secret fetch).
+
+**Known drift risk, deliberate and temporary**: `constants.py` still has the original strings (still what legacy code uses by default) — the new files are a second copy of the same ~45K characters of business/legal content. Editing one without the other silently desyncs them. Not resolved yet — Erik's rollout plan is to validate this in a test environment first; only after that does the config-file version become primary in prod, with `constants.py` kept as backup, so both copies are meant to coexist for now.
+
+### `app/config/settings.py` — shared technical config
+
+Closes the last of the 4 config/secrets/constants categories planned early in this migration. Holds values that are shared across all tenants and aren't secrets: `ALLOWED_EXTENSIONS`, `MAX_FILE_SIZE_MB`, `ALLOWED_MIME_TYPES`, `MIN_LANG_DETECTION_LEN`, `INSTAGRAM_CHARACTER_LIMIT`, `FALLBACK_MESSAGE`, `LANGUAGE_DISPLAY_NAMES` — each verified programmatically equal to its `constants.py` counterpart before being treated as migrated. `composition_root.py` reads from here now instead of `constants.py` (safe: it has no production callers yet). `constants.py` itself is untouched, same reasoning as the prompts (see above) — duplication is fine during the not-yet-cut-over window.
+
+### Known gaps / not yet done
+
+- **`GenerateConversationalReply` isn't decomposed.** `ConversationEnginePort`'s real implementation (`AzureOpenAIConversationEngineAdapter`) wraps the entire `run_conversation_with_rag` as one opaque unit rather than breaking its internals (prompt building, tool loop, language enforcement, content-filter fallback) into their own pieces. Deliberate, to avoid risking the carefully-tuned behavior documented below.
+- **Legacy `SessionMemoryRedis` fallback paths.** Both production files touched above fall back to the old non-tenant-scoped Redis reads when no `history` is passed — true for every current caller. These fallback branches (and `SessionMemoryRedis` itself) become removable dead code once production is fully cut over to the new use cases.
+- Redis is planned to move to a different provider later (unrelated to this migration, mentioned by Erik in passing) — `RedisConversationHistoryAdapter`'s connection is fully injected (`redis_url` param) specifically so that's a config change, not a rewrite, when it happens.
+
 ## Prompt-tuning session status (as of 2026-08-24)
 
 Erik hand-wrote 12 manual test cases to validate `DISAMBIGUATION_RULES`/`MINOR_SAFETY_RULE` end to end. They were run locally against `run_conversation_with_rag` directly (bypassing Zoho/webhooks entirely) using the repo's `.venv` — importing `app.services.cloud.azure.azure_openai` requires stubbing `pyodbc` in `sys.modules` first (no `libodbc.so.2` installed locally, and it's only needed lazily by `azure_tools.ensure_users_table`, unrelated to chat), and real multi-turn/session tests need the local Docker Redis container reachable by overriding `REDIS_URL_LOCAL=redis://127.0.0.1:6379` before `SessionMemoryRedis()` is constructed (the default `redis_local` hostname only resolves inside docker-compose's network). `app.core.config` must **not** be imported for this (it hard-requires `AZURE_CLIENT_ID`/`AZURE_TENANT_ID`, not set in the local `.env`) — the RAG path doesn't need it.

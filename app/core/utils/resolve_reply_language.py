@@ -15,6 +15,7 @@ async def resolve_reply_language(
     current_message: str | None = None,
     language_hint: str | None = None,
     use_history: bool = True,
+    history: list | None = None,
 ) -> str:
     """
     Resuelve por código el idioma en el que debe responder el LLM, en vez de
@@ -34,7 +35,12 @@ async def resolve_reply_language(
                 return lang
 
     if use_history:
-        history = await session_memory.get_session(session_id)
+        if history is None:
+            # comportamiento legacy: lee la sesión aquí mismo (sin tenant_id
+            # en la clave). Si el caller ya trae el historial -- ej. un
+            # adapter que lo obtiene vía ConversationHistoryPort -- se usa
+            # tal cual y no se vuelve a leer.
+            history = await session_memory.get_session(session_id)
         user_texts = [m["content"] for m in history if m.get("role") == "user"]
         if user_texts:
             clean_history = get_text_for_language_detection(" ".join(user_texts))

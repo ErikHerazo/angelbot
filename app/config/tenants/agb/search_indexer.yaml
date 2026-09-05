@@ -1,0 +1,2 @@
+search_endpoint: "https://agb-search.search.windows.net"
+indexer_name: "rag-updated-agb-container-indexer"
