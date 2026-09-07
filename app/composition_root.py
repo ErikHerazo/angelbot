@@ -107,7 +107,13 @@ async def _get_or_build_for_tenant(cache_key: str, tenant_id: str, builder: Call
 
 
 def _build_conversation_history() -> RedisConversationHistoryAdapter:
-    redis_url = os.getenv("REDIS_URL_LOCAL", "redis://127.0.0.1:6379")
+    if os.getenv("APP_ENV", "local").lower() == "prod":
+        host = os.getenv("REDIS_HOST_PROD")
+        port = os.getenv("REDIS_PORT_PROD")
+        password = os.getenv("REDIS_PASSWORD_PROD")
+        redis_url = f"rediss://:{password}@{host}:{port}"
+    else:
+        redis_url = os.getenv("REDIS_URL_LOCAL", "redis://127.0.0.1:6379")
     return RedisConversationHistoryAdapter(redis_url=redis_url)
 
 
