@@ -27,6 +27,10 @@ class ChatTestRequest(BaseModel):
     channel: str = "website"
     session_id: str | None = None
     visitor_language: str | None = None
+    # Solo lo usa /web/chat/test-hexagonal (este endpoint /test llama
+    # directo a run_conversation_with_rag, que no tiene motor alternativo) --
+    # vive aquí porque ambos endpoints comparten ChatTestRequest/Response.
+    engine: str = "azure_openai"
 
 
 class ChatTestResponse(BaseModel):

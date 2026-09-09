@@ -40,7 +40,7 @@ def test_success_path_returns_answer_captured_from_process_incoming_message(monk
 
     captured_chat_platform = None
 
-    async def fake_build_process_incoming_message(tenant_id, *, chat_platform):
+    async def fake_build_process_incoming_message(tenant_id, *, chat_platform, engine="azure_openai", include_flag_tools=True):
         nonlocal captured_chat_platform
         captured_chat_platform = chat_platform
         return FakeUseCase()
@@ -68,7 +68,7 @@ def test_reuses_provided_session_id(monkeypatch):
 
     chat_platform_holder = {}
 
-    async def fake_build_process_incoming_message(tenant_id, *, chat_platform):
+    async def fake_build_process_incoming_message(tenant_id, *, chat_platform, engine="azure_openai", include_flag_tools=True):
         chat_platform_holder["cp"] = chat_platform
         return FakeUseCase()
 

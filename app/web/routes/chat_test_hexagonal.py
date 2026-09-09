@@ -54,12 +54,29 @@ async def chat_test_hexagonal(
     if x_test_secret != CHAT_TEST_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    with log.operation(channel=payload.channel):
+    if payload.engine not in ("azure_openai", "claude"):
+        raise HTTPException(
+            status_code=422,
+            detail="engine debe ser 'azure_openai' o 'claude'",
+        )
+
+    with log.operation(channel=payload.channel, engine=payload.engine):
         session_id = payload.session_id or f"test-{uuid.uuid4()}"
         request_id = str(uuid.uuid4())
 
         chat_platform = _CapturingChatPlatform()
-        use_case = await build_process_incoming_message(TENANT_ID, chat_platform=chat_platform)
+        # include_flag_tools=False: este endpoint existe para comparar
+        # GPT-4o vs Claude en igualdad de condiciones -- ambos motores se
+        # conectan solo con is_customer_service_available/procedures_and_
+        # treatments_price_list, sin los 3 tools de señal (revisión,
+        # angustia emocional, menor de edad). Esos 3 casos dependen solo
+        # del prompt en ambos lados (decisión de Erik, 2026-09-09).
+        use_case = await build_process_incoming_message(
+            TENANT_ID,
+            chat_platform=chat_platform,
+            engine=payload.engine,
+            include_flag_tools=False,
+        )
 
         await use_case.execute(
             tenant_id=TENANT_ID,

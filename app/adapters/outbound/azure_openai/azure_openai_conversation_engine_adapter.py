@@ -13,6 +13,7 @@ from app.application.ports.conversation_history_port import ConversationHistoryP
 from app.application.ports.prompt_config_repository_port import PromptConfigRepositoryPort
 from app.application.use_cases.check_business_availability import CheckBusinessAvailability
 from app.application.use_cases.lookup_procedure_price import LookupProcedurePrice
+from app.core import constants
 from app.core.logging.structured_logger import get_logger
 
 log = get_logger(__name__)
@@ -62,11 +63,21 @@ class AzureOpenAIConversationEngineAdapter:
         check_business_availability: Optional[CheckBusinessAvailability] = None,
         get_lookup_procedure_price: Optional[Callable[[str], Awaitable[LookupProcedurePrice]]] = None,
         prompt_config: Optional[PromptConfigRepositoryPort] = None,
+        include_flag_tools: bool = True,
     ):
         self._conversation_history = conversation_history
         self._check_business_availability = check_business_availability
         self._get_lookup_procedure_price = get_lookup_procedure_price
         self._prompt_config = prompt_config
+        # Default True preserva el comportamiento de siempre (las 3 tools de
+        # señal -- revision/emotional_distress/minor_patient -- siempre
+        # anunciadas y con override). False las desconecta por completo (ni
+        # override ni schema anunciado a la API) para la comparativa
+        # GPT-4o vs Claude -- esos 3 casos pasan a depender solo del prompt
+        # (DISAMBIGUATION_RULES/MINOR_SAFETY_RULE). No se borra nada de
+        # azure_tools.py ni de los tool wrappers -- solo se dejan de usar
+        # aquí cuando include_flag_tools=False.
+        self._include_flag_tools = include_flag_tools
 
         if rag_runner is None:
             from app.services.cloud.azure.azure_openai import run_conversation_with_rag
@@ -84,7 +95,12 @@ class AzureOpenAIConversationEngineAdapter:
         channel: str,
         visitor_language: Optional[str] = None,
     ) -> str:
-        with log.operation(tenant_id=tenant_id, session_id=session_id, channel=channel):
+        with log.operation(
+            tenant_id=tenant_id,
+            session_id=session_id,
+            channel=channel,
+            model=constants.DEPLOYMENT_NAME_PRIMARY,
+        ):
             history = None
             if channel != "flow":
                 history = await self._conversation_history.get_history(tenant_id, session_id)
@@ -92,11 +108,13 @@ class AzureOpenAIConversationEngineAdapter:
             else:
                 log.debug("Flow channel, skipping history load")
 
-            tool_overrides = {
-                "flag_revision_or_reintervention_price_request": FlagRevisionOrReinterventionPriceRequestTool(),
-                "flag_emotional_distress": FlagEmotionalDistressTool(),
-                "flag_minor_patient": FlagMinorPatientTool(),
-            }
+            tool_overrides = {}
+            if self._include_flag_tools:
+                tool_overrides.update({
+                    "flag_revision_or_reintervention_price_request": FlagRevisionOrReinterventionPriceRequestTool(),
+                    "flag_emotional_distress": FlagEmotionalDistressTool(),
+                    "flag_minor_patient": FlagMinorPatientTool(),
+                })
 
             if self._check_business_availability is not None:
                 tool_overrides["is_customer_service_available"] = CheckBusinessAvailabilityTool(
@@ -137,6 +155,12 @@ class AzureOpenAIConversationEngineAdapter:
                         error_type=type(exc).__name__,
                     )
 
+            tools_override = None
+            if not self._include_flag_tools:
+                from app.services.cloud.azure import azure_tools
+
+                tools_override = azure_tools.COMPARISON_TOOLS
+
             answer = await self._rag_runner(
                 session_id=session_id,
                 user_question=user_question,
@@ -145,6 +169,7 @@ class AzureOpenAIConversationEngineAdapter:
                 history=history,
                 tool_overrides=tool_overrides,
                 base_prompt_override=base_prompt_override,
+                tools_override=tools_override,
             )
             log.debug("rag_runner returned", answer_length=len(answer) if answer else 0)
             return answer

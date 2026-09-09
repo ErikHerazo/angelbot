@@ -9,7 +9,7 @@ from app.services.cloud.azure import azure_tools
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-async def make_completion(messages, max_toks, force_text=False, use_data_sources=True):
+async def make_completion(messages, max_toks, force_text=False, use_data_sources=True, tools=None):
     """
     Make a call to Azure OpenAI ChatCompletion.
     If `force_text=True`, force tool_choice='none' to prevent further tool calls.
@@ -17,6 +17,10 @@ async def make_completion(messages, max_toks, force_text=False, use_data_sources
     entirely -- para llamadas que no necesitan RAG (ej. redactar una pregunta
     aclaratoria) y donde el contenido recuperado puede dominar la respuesta por
     encima de las instrucciones del propio mensaje de sistema.
+    `tools`: lista de tool schemas a anunciar a la API -- None (default,
+    todo caller existente) preserva el comportamiento legacy de anunciar
+    azure_tools.tools completo (las 5). Pasar una lista explícita (ej.
+    azure_tools.COMPARISON_TOOLS) restringe qué tools puede llamar el modelo.
     """
     async def completion_request(client, deployment):
         # 🔥 LOG DEL MODELO USADO
@@ -59,7 +63,7 @@ async def make_completion(messages, max_toks, force_text=False, use_data_sources
         return await client.chat.completions.create(
             model=deployment,
             messages=messages,
-            tools=azure_tools.tools,
+            tools=tools if tools is not None else azure_tools.tools,
             tool_choice="none" if force_text else "auto",
             temperature=constants.OPENAI_TEMPERATURE,
             max_tokens=max_toks,

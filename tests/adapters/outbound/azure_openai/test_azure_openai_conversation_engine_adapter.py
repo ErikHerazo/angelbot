@@ -264,3 +264,89 @@ async def test_still_calls_rag_runner_when_prompt_config_fails():
 
     assert answer == "respuesta con prompt legacy"
     assert captured["base_prompt_override"] is None
+
+
+async def test_include_flag_tools_true_by_default_preserves_legacy_behavior():
+    captured = {}
+
+    async def fake_rag_runner(**kwargs):
+        captured.update(kwargs)
+        return "ok"
+
+    adapter = AzureOpenAIConversationEngineAdapter(
+        conversation_history=FakeConversationHistory(),
+        rag_runner=fake_rag_runner,
+    )
+
+    await adapter.generate_reply(
+        tenant_id="agb", session_id="sess-1", user_question="hola", channel="website"
+    )
+
+    assert "flag_revision_or_reintervention_price_request" in captured["tool_overrides"]
+    assert "flag_emotional_distress" in captured["tool_overrides"]
+    assert "flag_minor_patient" in captured["tool_overrides"]
+    assert captured["tools_override"] is None
+
+
+async def test_include_flag_tools_false_disconnects_the_3_flag_tools():
+    captured = {}
+
+    async def fake_rag_runner(**kwargs):
+        captured.update(kwargs)
+        return "ok"
+
+    adapter = AzureOpenAIConversationEngineAdapter(
+        conversation_history=FakeConversationHistory(),
+        rag_runner=fake_rag_runner,
+        include_flag_tools=False,
+    )
+
+    await adapter.generate_reply(
+        tenant_id="agb", session_id="sess-1", user_question="hola", channel="website"
+    )
+
+    assert "flag_revision_or_reintervention_price_request" not in captured["tool_overrides"]
+    assert "flag_emotional_distress" not in captured["tool_overrides"]
+    assert "flag_minor_patient" not in captured["tool_overrides"]
+
+    from app.services.cloud.azure import azure_tools
+
+    tools_override_names = {t["function"]["name"] for t in captured["tools_override"]}
+    assert tools_override_names == {"is_customer_service_available", "procedures_and_treatments_price_list"}
+    assert captured["tools_override"] == azure_tools.COMPARISON_TOOLS
+
+
+async def test_include_flag_tools_false_still_wires_the_2_real_tools_when_deps_given():
+    class FakeCheckBusinessAvailability:
+        async def execute(self, tenant_id):
+            return True
+
+    async def fake_get_lookup_procedure_price(tenant_id):
+        class FakeLookupProcedurePrice:
+            async def execute(self, tenant_id, name_surgery_or_treatment):
+                return []
+
+        return FakeLookupProcedurePrice()
+
+    captured = {}
+
+    async def fake_rag_runner(**kwargs):
+        captured.update(kwargs)
+        return "ok"
+
+    adapter = AzureOpenAIConversationEngineAdapter(
+        conversation_history=FakeConversationHistory(),
+        rag_runner=fake_rag_runner,
+        check_business_availability=FakeCheckBusinessAvailability(),
+        get_lookup_procedure_price=fake_get_lookup_procedure_price,
+        include_flag_tools=False,
+    )
+
+    await adapter.generate_reply(
+        tenant_id="agb", session_id="sess-1", user_question="hola", channel="website"
+    )
+
+    assert set(captured["tool_overrides"].keys()) == {
+        "is_customer_service_available",
+        "procedures_and_treatments_price_list",
+    }

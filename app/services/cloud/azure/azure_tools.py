@@ -371,3 +371,16 @@ tools = [
         }
     }
 ]
+
+# Subconjunto de `tools` con solo las 2 tools "reales" (consultan datos --
+# horario, precios), sin las 3 tools de señal (flag_revision_or_reintervention_
+# price_request, flag_emotional_distress, flag_minor_patient). Usado para la
+# comparativa GPT-4o vs Claude (ver ClaudeFoundryConversationEngineAdapter y
+# AzureOpenAIConversationEngineAdapter's `include_flag_tools`): con este
+# subconjunto, esos 3 casos dejan de tener intercept de código y el LLM tiene
+# que manejarlos solo con las instrucciones del prompt (DISAMBIGUATION_RULES/
+# MINOR_SAFETY_RULE). No se borran las otras 3 tools, solo se dejan fuera de
+# esta lista -- azure_tools.tools (todas las 5) sigue siendo lo que usa el
+# flujo de producción real de Zoho.
+COMPARISON_TOOL_NAMES = {"is_customer_service_available", "procedures_and_treatments_price_list"}
+COMPARISON_TOOLS = [t for t in tools if t["function"]["name"] in COMPARISON_TOOL_NAMES]

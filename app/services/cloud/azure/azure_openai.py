@@ -30,6 +30,7 @@ async def run_conversation_with_rag(
     history: list | None = None,
     tool_overrides: dict | None = None,
     base_prompt_override: str | None = None,
+    tools_override: list | None = None,
 ):
     """
     Execute a conversation with Azure OpenAI using RAG + parallel function calls.
@@ -136,7 +137,13 @@ async def run_conversation_with_rag(
 
     try:
         # 🌀 First call with retry
-        response = await make_completion(messages, max_toks)
+        # tools_override: None (todo caller de producción) preserva el
+        # comportamiento legacy (anuncia las 5 tools). Un caller de
+        # comparación (ver AzureOpenAIConversationEngineAdapter's
+        # `include_flag_tools`) puede pasar azure_tools.COMPARISON_TOOLS
+        # para que el LLM ni siquiera vea las 3 tools de señal -- si no
+        # puede llamarlas, esos 3 casos se manejan solo con el prompt.
+        response = await make_completion(messages, max_toks, tools=tools_override)
         response_message = response.choices[0].message
 
         # 🚀 Parallel call control (parallel tool calls)

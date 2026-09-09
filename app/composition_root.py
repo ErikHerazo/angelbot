@@ -5,6 +5,9 @@ from typing import Awaitable, Callable, Dict, Optional, Tuple, TypeVar
 from app.adapters.outbound.azure_openai.azure_openai_conversation_engine_adapter import (
     AzureOpenAIConversationEngineAdapter,
 )
+from app.adapters.outbound.claude_foundry.claude_foundry_conversation_engine_adapter import (
+    ClaudeFoundryConversationEngineAdapter,
+)
 from app.adapters.outbound.redis.redis_conversation_history_adapter import (
     RedisConversationHistoryAdapter,
 )
@@ -143,27 +146,80 @@ async def get_cached_lookup_procedure_price(tenant_id: str) -> LookupProcedurePr
     )
 
 
+def build_claude_conversation_engine(
+    conversation_history: "RedisConversationHistoryAdapter",
+    *,
+    check_business_availability: Optional[CheckBusinessAvailability] = None,
+    get_lookup_procedure_price: Optional[Callable[[str], Awaitable[LookupProcedurePrice]]] = None,
+) -> ClaudeFoundryConversationEngineAdapter:
+    """Builds the Claude-via-Microsoft-Foundry alternative to
+    AzureOpenAIConversationEngineAdapter -- see that adapter's docstring.
+    Reads the same infra-level env vars as the Azure OpenAI client
+    (client.py) and the main-index lookup (query_service.py) rather than
+    per-tenant config files, matching existing precedent: none of those are
+    tenant-scoped today either, in legacy or hexagonal code.
+
+    `check_business_availability`/`get_lookup_procedure_price` wire the same
+    2 tools as AzureOpenAIConversationEngineAdapter's `include_flag_tools=False`
+    mode -- see ClaudeFoundryConversationEngineAdapter's docstring for why
+    only these 2 (not the 3 flag tools) are connected on either engine for
+    this comparison."""
+    return ClaudeFoundryConversationEngineAdapter(
+        conversation_history=conversation_history,
+        prompt_config=_prompt_config,
+        foundry_api_key=os.getenv("AZURE_FOUNDRY_CLAUDE_API_KEY"),
+        foundry_endpoint=os.getenv(
+            "AZURE_FOUNDRY_CLAUDE_ENDPOINT",
+            "https://foundry-test-clinyq-resource.openai.azure.com/anthropic",
+        ),
+        deployment=os.getenv("AZURE_FOUNDRY_CLAUDE_DEPLOYMENT", "claude-sonnet-5-clinyq"),
+        search_endpoint=os.getenv("AZURE_AI_SEARCH_ENDPOINT"),
+        search_api_key=os.getenv("AZURE_AI_SEARCH_API_KEY"),
+        main_search_index=os.getenv("AZURE_AI_SEARCH_INDEX"),
+        price_search_index=os.getenv("AZURE_AI_SEARCH_PRICE_LIST_INDEX"),
+        semantic_configuration=os.getenv("SEMANTIC_CONFIGURATION"),
+        check_business_availability=check_business_availability or _check_business_availability,
+        get_lookup_procedure_price=get_lookup_procedure_price or get_cached_lookup_procedure_price,
+    )
+
+
 async def build_process_incoming_message(
     tenant_id: str,
     *,
+    engine: str = "azure_openai",
     chat_platform: Optional[ChatPlatformPort] = None,
     rag_runner: Optional[Callable] = None,
     compress_fn: Optional[Callable] = None,
     check_business_availability: Optional[CheckBusinessAvailability] = None,
     get_lookup_procedure_price: Optional[Callable[[str], Awaitable[LookupProcedurePrice]]] = None,
     prompt_config: Optional[PromptConfigRepositoryPort] = None,
+    conversation_engine: Optional[object] = None,
+    include_flag_tools: bool = True,
 ) -> ProcessIncomingMessage:
     """Wires ProcessIncomingMessage with real adapters for the given tenant.
 
     `chat_platform`, `rag_runner`, `compress_fn`, `check_business_availability`,
-    `get_lookup_procedure_price` and `prompt_config` can all be overridden
-    (used by tests to avoid hitting real Zoho/Azure OpenAI/Azure Search over
-    the network) -- when omitted, real adapters/functions are used, exactly
-    as production would. `chat_platform` and the price-lookup tool (when not
-    overridden) are both cached per tenant_id, since this builder runs once
-    per incoming chat message.
+    `get_lookup_procedure_price`, `prompt_config` and `conversation_engine`
+    can all be overridden (used by tests to avoid hitting real
+    Zoho/Azure OpenAI/Azure Search/Foundry over the network) -- when omitted,
+    real adapters/functions are used, exactly as production would.
+    `chat_platform` and the price-lookup tool (when not overridden) are both
+    cached per tenant_id, since this builder runs once per incoming chat
+    message.
+
+    `engine` picks which ConversationEnginePort implementation to build --
+    "azure_openai" (default, the real production path) or "claude" (Claude
+    Sonnet 5 via Microsoft Foundry -- see ClaudeFoundryConversationEngineAdapter's
+    docstring). Ignored when `conversation_engine` is passed directly.
+
+    `include_flag_tools` (azure_openai only, default True preserves prod
+    behavior) -- False disconnects the 3 flag tools (revision/reintervention,
+    emotional distress, minor patient), for the GPT-4o vs Claude comparison
+    where both engines are wired with only `is_customer_service_available`/
+    `procedures_and_treatments_price_list` (Claude never had the 3 flag
+    tools to begin with, so this only matters for azure_openai).
     """
-    with log.operation(tenant_id=tenant_id):
+    with log.operation(tenant_id=tenant_id, engine=engine):
         tenant_repository = FilesystemTenantRepository(config_dir=CONFIG_DIR)
         await tenant_repository.get_tenant(tenant_id)  # validates config exists
 
@@ -172,13 +228,24 @@ async def build_process_incoming_message(
 
         conversation_history = _build_conversation_history()
 
-        conversation_engine = AzureOpenAIConversationEngineAdapter(
-            conversation_history=conversation_history,
-            rag_runner=rag_runner,
-            check_business_availability=check_business_availability or _check_business_availability,
-            get_lookup_procedure_price=get_lookup_procedure_price or get_cached_lookup_procedure_price,
-            prompt_config=prompt_config or _prompt_config,
-        )
+        if conversation_engine is None:
+            if engine == "claude":
+                conversation_engine = build_claude_conversation_engine(
+                    conversation_history,
+                    check_business_availability=check_business_availability,
+                    get_lookup_procedure_price=get_lookup_procedure_price,
+                )
+            elif engine == "azure_openai":
+                conversation_engine = AzureOpenAIConversationEngineAdapter(
+                    conversation_history=conversation_history,
+                    rag_runner=rag_runner,
+                    check_business_availability=check_business_availability or _check_business_availability,
+                    get_lookup_procedure_price=get_lookup_procedure_price or get_cached_lookup_procedure_price,
+                    prompt_config=prompt_config or _prompt_config,
+                    include_flag_tools=include_flag_tools,
+                )
+            else:
+                raise ValueError(f"Unknown engine: {engine!r} (expected 'azure_openai' or 'claude')")
 
         reply_compressor = LLMReplyCompressionAdapter(compress_fn=compress_fn)
 
