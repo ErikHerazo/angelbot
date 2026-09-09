@@ -14,6 +14,8 @@ Microservicio FastAPI que impulsa **Aesthea**, el asistente virtual multilingüe
 Para el mapa completo de módulos, flujo de datos exacto y decisiones de diseño, ver [`CLAUDE.md`](./CLAUDE.md).
 
 > **En progreso**: migración a arquitectura hexagonal (ports & adapters) con soporte multi-tenant, en la rama `feature/hexagonal-architecture-migration`. Es aditiva — nada de esto reemplaza todavía el flujo descrito arriba, que sigue siendo el que atiende tráfico real. Detalle completo en la sección "Hexagonal architecture migration" de `CLAUDE.md`.
+>
+> **En progreso (rama `feature/switch-to-claude`)**: comparativa GPT-4o vs Claude Sonnet 5 (vía Microsoft Foundry) sobre el pipeline hexagonal — `POST /web/chat/test-hexagonal` acepta un campo `engine` (`azure_openai` | `claude`). Detalle en la sección "Claude engine for the GPT-4o vs Claude comparison" de `CLAUDE.md`.
 
 ## Requisitos
 
@@ -32,7 +34,7 @@ cp .env.example .env
 # completa las credenciales de Azure, Redis, Zoho y SQL
 ```
 
-`.env.example` trae un set mínimo; el `.env` real (gitignored) necesita además credenciales de Redis, Zoho, SQL Server y Blob Storage — revisa `os.getenv(` en `app/` para el listado completo. Si falta alguna variable crítica de Azure/Celery, `config.py` lanza un `RuntimeError` al arrancar.
+`.env.example` trae un set mínimo; el `.env` real (gitignored) necesita además credenciales de Redis, Zoho, SQL Server y Blob Storage — revisa `os.getenv(` en `app/` para el listado completo. Si falta alguna variable crítica de Azure/Celery, `config.py` lanza un `RuntimeError` al arrancar. Para probar el motor Claude vía `/web/chat/test-hexagonal` hace falta además `AZURE_FOUNDRY_CLAUDE_API_KEY` (ver `.env.example`).
 
 ## Correr en local (sin Docker)
 
