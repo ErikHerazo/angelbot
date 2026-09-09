@@ -71,12 +71,16 @@ class AzureOpenAIConversationEngineAdapter:
         self._prompt_config = prompt_config
         # Default True preserva el comportamiento de siempre (las 3 tools de
         # señal -- revision/emotional_distress/minor_patient -- siempre
-        # anunciadas y con override). False las desconecta por completo (ni
-        # override ni schema anunciado a la API) para la comparativa
-        # GPT-4o vs Claude -- esos 3 casos pasan a depender solo del prompt
-        # (DISAMBIGUATION_RULES/MINOR_SAFETY_RULE). No se borra nada de
-        # azure_tools.py ni de los tool wrappers -- solo se dejan de usar
-        # aquí cuando include_flag_tools=False.
+        # anunciadas y con override; el corte de ambigüedad de precios
+        # activo). False desconecta TODOS los intercepts de código
+        # exclusivos de GPT-4o para la comparativa GPT-4o vs Claude (ni
+        # override ni schema anunciado a la API para las 3 tools de señal;
+        # tampoco el corte de ambigüedad de precios, vía
+        # price_ambiguity_cutoff más abajo) -- esos casos pasan a depender
+        # solo del prompt (DISAMBIGUATION_RULES/MINOR_SAFETY_RULE) en los
+        # dos motores por igual, ya que Claude nunca tuvo ninguno de estos
+        # intercepts. No se borra nada de azure_tools.py/azure_openai.py --
+        # solo se dejan de usar aquí cuando include_flag_tools=False.
         self._include_flag_tools = include_flag_tools
 
         if rag_runner is None:
@@ -170,6 +174,7 @@ class AzureOpenAIConversationEngineAdapter:
                 tool_overrides=tool_overrides,
                 base_prompt_override=base_prompt_override,
                 tools_override=tools_override,
+                price_ambiguity_cutoff=self._include_flag_tools,
             )
             log.debug("rag_runner returned", answer_length=len(answer) if answer else 0)
             return answer

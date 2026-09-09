@@ -286,6 +286,7 @@ async def test_include_flag_tools_true_by_default_preserves_legacy_behavior():
     assert "flag_emotional_distress" in captured["tool_overrides"]
     assert "flag_minor_patient" in captured["tool_overrides"]
     assert captured["tools_override"] is None
+    assert captured["price_ambiguity_cutoff"] is True
 
 
 async def test_include_flag_tools_false_disconnects_the_3_flag_tools():
@@ -314,6 +315,7 @@ async def test_include_flag_tools_false_disconnects_the_3_flag_tools():
     tools_override_names = {t["function"]["name"] for t in captured["tools_override"]}
     assert tools_override_names == {"is_customer_service_available", "procedures_and_treatments_price_list"}
     assert captured["tools_override"] == azure_tools.COMPARISON_TOOLS
+    assert captured["price_ambiguity_cutoff"] is False
 
 
 async def test_include_flag_tools_false_still_wires_the_2_real_tools_when_deps_given():
