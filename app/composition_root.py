@@ -115,10 +115,8 @@ def _build_conversation_history() -> RedisConversationHistoryAdapter:
         port = os.getenv("REDIS_PORT_PROD")
         password = os.getenv("REDIS_PASSWORD_PROD")
         redis_url = f"rediss://:{password}@{host}:{port}"
-        # Azure Managed Redis (Redis Enterprise), OSSCluster policy por
-        # defecto -- ver RedisConversationHistoryAdapter's docstring.
-        return RedisConversationHistoryAdapter(redis_url=redis_url, cluster=True)
-    redis_url = os.getenv("REDIS_URL_LOCAL", "redis://127.0.0.1:6379")
+    else:
+        redis_url = os.getenv("REDIS_URL_LOCAL", "redis://127.0.0.1:6379")
     return RedisConversationHistoryAdapter(redis_url=redis_url)
 
 
