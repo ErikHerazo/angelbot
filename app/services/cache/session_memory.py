@@ -1,21 +1,27 @@
 import os
 import json
 import redis.asyncio as aioredis
+from redis.asyncio.cluster import RedisCluster
 
 
 class SessionMemoryRedis:
     def __init__(self):
         self.ttl = 900  # 15 minutos por sesión
         app_env = os.getenv("APP_ENV", "local").lower()
+        self._cluster = False
 
         if app_env == "prod":
-            # Redis Enterprise en Azure con SSL y contraseña separada
+            # Azure Managed Redis (Redis Enterprise) con SSL y contraseña
+            # separada -- OSSCluster policy por defecto (2026-09-09), de ahí
+            # self._cluster=True. Cada key acá es un string simple sin
+            # comandos multi-key, así que no hace falta hash tags.
             host = os.getenv("REDIS_HOST_PROD")
             port = os.getenv("REDIS_PORT_PROD")
             password = os.getenv("REDIS_PASSWORD_PROD")
             # rediss://<password>@<host>:<port>
             self.redis_url = f"rediss://:{password}@{host}:{port}"
             self.redis_kwargs = {"decode_responses": True}
+            self._cluster = True
         else:
             # Redis local (docker)
             self.redis_url = os.getenv("REDIS_URL_LOCAL", "redis://redis_local:6379")
@@ -25,10 +31,22 @@ class SessionMemoryRedis:
 
     async def connect(self):
         if self.redis is None:
-            self.redis = await aioredis.from_url(
-                self.redis_url,
-                **self.redis_kwargs
-            )
+            if self._cluster:
+                # ssl_check_hostname=False: ver el mismo comentario en
+                # RedisConversationHistoryAdapter._client -- workaround
+                # confirmado contra la instancia real de Azure Managed
+                # Redis de AGB (2026-09-09), TLS se mantiene activo.
+                self.redis = await RedisCluster.from_url(
+                    self.redis_url,
+                    ssl_cert_reqs=None,
+                    ssl_check_hostname=False,
+                    **self.redis_kwargs
+                )
+            else:
+                self.redis = await aioredis.from_url(
+                    self.redis_url,
+                    **self.redis_kwargs
+                )
 
     async def ensure_connected(self):
         if self.redis is None:
