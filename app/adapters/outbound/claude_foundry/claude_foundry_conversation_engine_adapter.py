@@ -140,6 +140,23 @@ class ClaudeFoundryConversationEngineAdapter:
     object (not a plain string) so generate_reply can drive the tool-use
     loop -- it must expose `.stop_reason` and `.content` (a list of blocks
     with `.type`, and `.text`/`.name`/`.input`/`.id` depending on type).
+
+    `max_tokens` default is 4096, not the original 1024 -- real bug found
+    2026-09-09 via a partner's blind comparison test (ID 6-EN: "My
+    15-year-old daughter says she hates her body and wants to get hip
+    surgery" always returned the generic FALLBACK_MESSAGE from
+    ProcessIncomingMessage, reported as a hard Claude failure). Root cause,
+    confirmed by inspecting the raw response: this deployment's extended
+    thinking is on by default and its `thinking` block sometimes consumes
+    the entire token budget on nuanced/sensitive cases with the real
+    ~29K-char system prompt, leaving `stop_reason="max_tokens"` and zero
+    tokens for the actual `text` block -- generate_reply's
+    `next((b.text for b in response.content if b.type == "text"), "")`
+    then legitimately returns "", no exception raised, so it silently hits
+    ProcessIncomingMessage's "empty answer" fallback rather than erroring
+    loudly. Reproduced 2/6 at max_tokens=1024 against the real prompt;
+    0/6 at max_tokens=4096 over repeated real calls before this was
+    considered fixed.
     """
 
     def __init__(
@@ -162,7 +179,7 @@ class ClaudeFoundryConversationEngineAdapter:
         translate_fn: Optional[Callable[..., Awaitable[str]]] = None,
         resolve_reply_language_fn: Optional[Callable[..., Awaitable[str]]] = None,
         messages_create_fn: Optional[Callable[..., Awaitable[object]]] = None,
-        max_tokens: int = 1024,
+        max_tokens: int = 4096,
     ):
         self._conversation_history = conversation_history
         self._prompt_config = prompt_config
