@@ -141,7 +141,7 @@ class ClaudeFoundryConversationEngineAdapter:
     loop -- it must expose `.stop_reason` and `.content` (a list of blocks
     with `.type`, and `.text`/`.name`/`.input`/`.id` depending on type).
 
-    `max_tokens` default is 4096, not the original 1024 -- real bug found
+    `max_tokens` default is 8192, not the original 1024 -- real bug found
     2026-09-09 via a partner's blind comparison test (ID 6-EN: "My
     15-year-old daughter says she hates her body and wants to get hip
     surgery" always returned the generic FALLBACK_MESSAGE from
@@ -156,7 +156,13 @@ class ClaudeFoundryConversationEngineAdapter:
     ProcessIncomingMessage's "empty answer" fallback rather than erroring
     loudly. Reproduced 2/6 at max_tokens=1024 against the real prompt;
     0/6 at max_tokens=4096 over repeated real calls before this was
-    considered fixed.
+    considered fixed. Raised again to 8192 the same day, alongside
+    reverting `AzureSearchPriceCatalogAdapter`'s `searchMode` to the Azure
+    default (see that adapter's docstring) -- without the "all" filter, a
+    single price query can return far more raw catalog rows for the model
+    to reason over, so the same thinking-vs-text budget squeeze could
+    recur at a lower `max_tokens` on a heavier query, even without hitting
+    the exact original repro case.
     """
 
     def __init__(
@@ -179,7 +185,7 @@ class ClaudeFoundryConversationEngineAdapter:
         translate_fn: Optional[Callable[..., Awaitable[str]]] = None,
         resolve_reply_language_fn: Optional[Callable[..., Awaitable[str]]] = None,
         messages_create_fn: Optional[Callable[..., Awaitable[object]]] = None,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ):
         self._conversation_history = conversation_history
         self._prompt_config = prompt_config
