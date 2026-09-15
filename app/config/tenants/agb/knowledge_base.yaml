@@ -1,0 +1,3 @@
+search_endpoint: "https://agb-search.search.windows.net"
+index_name: "rag-updated-agb-container"
+semantic_configuration: "rag-updated-agb-container-semantic-configuration"

@@ -1,0 +1,5 @@
+fastmcp==4.0.3
+httpx
+PyYAML
+python-dotenv
+azure-storage-blob==12.30.1
