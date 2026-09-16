@@ -30,6 +30,8 @@ async def run_conversation_with_rag(
     history: list | None = None,
     tool_overrides: dict | None = None,
     base_prompt_override: str | None = None,
+    tools_override: list | None = None,
+    price_ambiguity_cutoff: bool = True,
 ):
     """
     Execute a conversation with Azure OpenAI using RAG + parallel function calls.
@@ -136,7 +138,13 @@ async def run_conversation_with_rag(
 
     try:
         # 🌀 First call with retry
-        response = await make_completion(messages, max_toks)
+        # tools_override: None (todo caller de producción) preserva el
+        # comportamiento legacy (anuncia las 5 tools). Un caller de
+        # comparación (ver AzureOpenAIConversationEngineAdapter's
+        # `include_flag_tools`) puede pasar azure_tools.COMPARISON_TOOLS
+        # para que el LLM ni siquiera vea las 3 tools de señal -- si no
+        # puede llamarlas, esos 3 casos se manejan solo con el prompt.
+        response = await make_completion(messages, max_toks, tools=tools_override)
         response_message = response.choices[0].message
 
         # 🚀 Parallel call control (parallel tool calls)
@@ -188,12 +196,21 @@ async def run_conversation_with_rag(
                         # dejar que el LLM elija o muestre uno o varios
                         # precios (ya se probó que no es confiable), y
                         # responde con una pregunta aclaratoria fija.
-                        try:
-                            parsed_response = json.loads(function_response)
-                            if len(parsed_response.get("results", [])) > 1:
-                                ambiguous_procedure_name = function_args.get("name_surgery_or_treatment")
-                        except Exception:
-                            pass
+                        # price_ambiguity_cutoff=False (comparativa GPT-4o vs
+                        # Claude, ver ClaudeFoundryConversationEngineAdapter)
+                        # desactiva este intercept -- Claude nunca lo tuvo,
+                        # así que para que la comparación sea justa (mismos
+                        # resultados crudos de Azure AI Search a ambos LLMs,
+                        # ninguna función exclusiva de GPT-4o) también se
+                        # desconecta acá. No se borra: sigue activo por
+                        # defecto (True) para el flujo real de Zoho.
+                        if price_ambiguity_cutoff:
+                            try:
+                                parsed_response = json.loads(function_response)
+                                if len(parsed_response.get("results", [])) > 1:
+                                    ambiguous_procedure_name = function_args.get("name_surgery_or_treatment")
+                            except Exception:
+                                pass
                     elif function_name == "flag_revision_or_reintervention_price_request":
                         # 🔁 Señal del LLM: ya identificó que es una revisión/
                         # reintervención con pregunta de precio. El código toma

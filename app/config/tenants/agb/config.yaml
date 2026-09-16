@@ -28,6 +28,11 @@ price_catalog:
   search_endpoint: "https://agb-search.search.windows.net"
   index_name: "rag-structured-data-3-large"
 
+knowledge_base:
+  search_endpoint: "https://agb-search.search.windows.net"
+  index_name: "rag-updated-agb-container"
+  semantic_configuration: "rag-updated-agb-container-semantic-configuration"
+
 search_indexer:
   search_endpoint: "https://agb-search.search.windows.net"
   indexer_name: "rag-updated-agb-container-indexer"

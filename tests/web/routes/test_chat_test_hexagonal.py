@@ -40,7 +40,9 @@ def test_success_path_returns_answer_captured_from_process_incoming_message(monk
 
     captured_chat_platform = None
 
-    async def fake_build_process_incoming_message(tenant_id, *, chat_platform, conversation_engine=None):
+    async def fake_build_process_incoming_message(
+        tenant_id, *, chat_platform, engine="azure_openai", include_flag_tools=True, conversation_engine=None
+    ):
         nonlocal captured_chat_platform
         captured_chat_platform = chat_platform
         return FakeUseCase()
@@ -68,7 +70,9 @@ def test_reuses_provided_session_id(monkeypatch):
 
     chat_platform_holder = {}
 
-    async def fake_build_process_incoming_message(tenant_id, *, chat_platform, conversation_engine=None):
+    async def fake_build_process_incoming_message(
+        tenant_id, *, chat_platform, engine="azure_openai", include_flag_tools=True, conversation_engine=None
+    ):
         chat_platform_holder["cp"] = chat_platform
         return FakeUseCase()
 
@@ -95,7 +99,7 @@ def test_returns_422_for_unknown_engine():
     assert response.status_code == 422
 
 
-def test_langgraph_engine_passes_built_conversation_engine(monkeypatch):
+def test_langgraph_engine_is_forwarded_to_build_process_incoming_message(monkeypatch):
     client = make_client(secret="the-real-secret")
 
     class FakeUseCase:
@@ -104,14 +108,14 @@ def test_langgraph_engine_passes_built_conversation_engine(monkeypatch):
 
     captured = {}
 
-    async def fake_build_process_incoming_message(tenant_id, *, chat_platform, conversation_engine=None):
+    async def fake_build_process_incoming_message(
+        tenant_id, *, chat_platform, engine="azure_openai", include_flag_tools=True, conversation_engine=None
+    ):
         captured["chat_platform"] = chat_platform
-        captured["conversation_engine"] = conversation_engine
+        captured["engine"] = engine
         return FakeUseCase()
 
-    fake_engine = object()
     monkeypatch.setattr(module, "build_process_incoming_message", fake_build_process_incoming_message)
-    monkeypatch.setattr(module, "build_langgraph_conversation_engine", lambda: fake_engine)
 
     response = client.post(
         "/test-hexagonal",
@@ -120,4 +124,4 @@ def test_langgraph_engine_passes_built_conversation_engine(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert captured["conversation_engine"] is fake_engine
+    assert captured["engine"] == "langgraph"

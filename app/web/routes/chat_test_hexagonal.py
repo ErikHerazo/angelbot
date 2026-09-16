@@ -3,7 +3,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Header
 
-from app.composition_root import build_langgraph_conversation_engine, build_process_incoming_message
+from app.composition_root import build_process_incoming_message
 from app.core.logging.structured_logger import get_logger
 from app.web.routes.chat_test import ChatTestRequest, ChatTestResponse
 
@@ -49,9 +49,11 @@ async def chat_test_hexagonal(
     X-Test-Secret con el mismo valor.
 
     `payload.engine`: "azure_openai" (default, AzureOpenAIConversationEngineAdapter,
-    el pipeline hexagonal de siempre) o "langgraph" (el agente nuevo --
-    orchestrator + 4 ramas, completions vía Claude/Foundry, tools vía MCP,
-    ver CLAUDE.md "LangGraph agent").
+    el pipeline hexagonal de siempre), "claude" (ClaudeFoundryConversationEngineAdapter,
+    motor opaco de la comparativa GPT-4o vs Claude) o "langgraph" (el agente
+    nuevo -- orchestrator + 4 ramas, completions vía Claude/Foundry, tools vía
+    MCP, ver CLAUDE.md "LangGraph agent"). `build_process_incoming_message`
+    hace la selección real -- este endpoint solo valida y reenvía `engine`.
     """
     if not CHAT_TEST_SECRET:
         raise HTTPException(status_code=404, detail="Not found")
@@ -59,17 +61,29 @@ async def chat_test_hexagonal(
     if x_test_secret != CHAT_TEST_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if payload.engine not in ("azure_openai", "langgraph"):
-        raise HTTPException(status_code=422, detail="engine debe ser 'azure_openai' o 'langgraph'")
+    if payload.engine not in ("azure_openai", "claude", "langgraph"):
+        raise HTTPException(
+            status_code=422,
+            detail="engine debe ser 'azure_openai', 'claude' o 'langgraph'",
+        )
 
     with log.operation(channel=payload.channel, engine=payload.engine):
         session_id = payload.session_id or f"test-{uuid.uuid4()}"
         request_id = str(uuid.uuid4())
 
         chat_platform = _CapturingChatPlatform()
-        conversation_engine = build_langgraph_conversation_engine() if payload.engine == "langgraph" else None
+        # include_flag_tools=False: este endpoint existe para comparar
+        # motores en igualdad de condiciones -- azure_openai/claude se
+        # conectan solo con is_customer_service_available/procedures_and_
+        # treatments_price_list, sin los 3 tools de señal (revisión,
+        # angustia emocional, menor de edad); no tiene efecto en "langgraph"
+        # (ese motor no toma este parámetro). Esos 3 casos dependen solo del
+        # prompt en todos los motores (decisión de Erik, 2026-09-09).
         use_case = await build_process_incoming_message(
-            TENANT_ID, chat_platform=chat_platform, conversation_engine=conversation_engine
+            TENANT_ID,
+            chat_platform=chat_platform,
+            engine=payload.engine,
+            include_flag_tools=False,
         )
 
         await use_case.execute(
