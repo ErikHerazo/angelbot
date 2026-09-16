@@ -1,0 +1,6 @@
+retrieval:
+  max_tool_iterations: 4
+
+mcp_servers:
+  azure_search_url: "http://localhost:8931/mcp"
+  zoho_url: "http://localhost:8932/mcp"

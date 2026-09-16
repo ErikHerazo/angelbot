@@ -17,3 +17,5 @@ Jinja2==3.1.6
 celery==5.6.2
 tiktoken==0.12.0
 langchain-openai==1.2.1
+langgraph==1.2.10
+anthropic==1.5.0

@@ -22,15 +22,16 @@ async def test_reads_agb_tenant_from_real_config():
 async def test_reads_tenant_from_temp_config_dir(tmp_path):
     tenant_dir = tmp_path / "clienteb"
     tenant_dir.mkdir()
-    (tenant_dir / "tenant.yaml").write_text(
-        "tenant_id: clienteb\n"
-        "legal_name: Cliente B SA\n"
-        "trade_name: Cliente B\n"
-        "address: Calle Falsa 123\n"
-        "city: Bogotá\n"
-        "country: CO\n"
-        "tax_id: '900123456-7'\n"
-        "timezone: America/Bogota\n"
+    (tenant_dir / "config.yaml").write_text(
+        "tenant:\n"
+        "  tenant_id: clienteb\n"
+        "  legal_name: Cliente B SA\n"
+        "  trade_name: Cliente B\n"
+        "  address: Calle Falsa 123\n"
+        "  city: Bogotá\n"
+        "  country: CO\n"
+        "  tax_id: '900123456-7'\n"
+        "  timezone: America/Bogota\n"
     )
     repository = FilesystemTenantRepository(config_dir=str(tmp_path))
 

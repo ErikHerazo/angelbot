@@ -1,9 +1,6 @@
-import asyncio
-import os
 from datetime import time
 
-import yaml
-
+from app.adapters.outbound.tenant_config.tenant_config_file import read_tenant_config_block
 from app.domain.value_objects.business_hours import BusinessHoursSchedule, BusinessHoursWindow
 
 _WEEKDAY_NAMES = [
@@ -18,21 +15,14 @@ _WEEKDAY_NAMES = [
 
 
 class FilesystemBusinessHoursConfigRepository:
-    """Implements BusinessHoursConfigRepositoryPort, reading business_hours.yaml
-    from config/tenants/{tenant_id}/."""
+    """Implements BusinessHoursConfigRepositoryPort, reading the
+    "business_hours" block from config/tenants/{tenant_id}/config.yaml."""
 
     def __init__(self, config_dir: str):
         self._config_dir = config_dir
 
     async def get_schedule(self, tenant_id: str) -> BusinessHoursSchedule:
-        return await asyncio.to_thread(self._read_schedule, tenant_id)
-
-    def _read_schedule(self, tenant_id: str) -> BusinessHoursSchedule:
-        path = os.path.join(self._config_dir, tenant_id, "business_hours.yaml")
-
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
+        data = await read_tenant_config_block(self._config_dir, tenant_id, "business_hours")
         raw_schedule = data.get("schedule", {})
         windows_by_weekday = {}
 

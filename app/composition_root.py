@@ -53,8 +53,35 @@ from app.adapters.outbound.tenant_config.filesystem_search_indexer_config_reposi
 from app.adapters.outbound.tenant_config.filesystem_prompt_config_repository import (
     FilesystemPromptConfigRepository,
 )
+from app.adapters.outbound.azure_openai.azure_openai_llm_adapter import AzureOpenAILLMAdapter
+from app.adapters.outbound.claude_foundry.claude_foundry_llm_adapter import ClaudeFoundryLLMAdapter
+from app.adapters.outbound.tenant_config.filesystem_claude_llm_config_repository import (
+    FilesystemClaudeLLMConfigRepository,
+)
+from app.adapters.outbound.langgraph.langgraph_conversation_engine_adapter import (
+    LangGraphConversationEngineAdapter,
+)
+from app.adapters.outbound.language.reply_language_enforcer_adapter import ReplyLanguageEnforcerAdapter
+from app.adapters.outbound.mcp.mcp_http_client import McpHttpClient
+from app.adapters.outbound.mcp.mcp_retrieval_tools_adapter import McpRetrievalToolsAdapter
+from app.adapters.outbound.mcp.mcp_zoho_chat_platform_adapter import McpZohoChatPlatformAdapter
+from app.adapters.outbound.tenant_config.filesystem_advisor_available_reply_config_repository import (
+    FilesystemAdvisorAvailableReplyConfigRepository,
+)
+from app.adapters.outbound.tenant_config.filesystem_agenda_reply_config_repository import (
+    FilesystemAgendaReplyConfigRepository,
+)
+from app.adapters.outbound.tenant_config.filesystem_flow_confirmation_reply_config_repository import (
+    FilesystemFlowConfirmationReplyConfigRepository,
+)
+from app.adapters.outbound.tenant_config.filesystem_llm_config_repository import (
+    FilesystemLLMConfigRepository,
+)
 from app.application.ports.chat_platform_port import ChatPlatformPort
+from app.application.ports.conversation_engine_port import ConversationEnginePort
 from app.application.ports.prompt_config_repository_port import PromptConfigRepositoryPort
+from app.application.use_cases.conversation.graph import build_conversation_graph
+from openai import AsyncAzureOpenAI
 from app.application.use_cases.acknowledge_file_upload import AcknowledgeFileUpload
 from app.application.use_cases.check_business_availability import CheckBusinessAvailability
 from app.application.use_cases.handle_greeting_trigger import HandleGreetingTrigger
@@ -83,6 +110,19 @@ _check_business_availability = CheckBusinessAvailability(
     clock=SystemClockAdapter(),
 )
 _prompt_config = FilesystemPromptConfigRepository(config_dir=CONFIG_DIR)
+_llm_config_repository = FilesystemLLMConfigRepository(config_dir=CONFIG_DIR)
+_claude_llm_config_repository = FilesystemClaudeLLMConfigRepository(config_dir=CONFIG_DIR)
+_advisor_available_reply_config = FilesystemAdvisorAvailableReplyConfigRepository(config_dir=CONFIG_DIR)
+_agenda_reply_config = FilesystemAgendaReplyConfigRepository(config_dir=CONFIG_DIR)
+_flow_confirmation_reply_config = FilesystemFlowConfirmationReplyConfigRepository(config_dir=CONFIG_DIR)
+
+# clinyq-mcp-* server locations -- shared infra, not tenant config (tenant_id
+# is a per-call argument to each tool, not a URL difference), read from
+# app/config/config.yaml's "mcp_servers" block. Both repos default to
+# container port 8931 internally; if running more than one locally at once,
+# remap host ports (see each repo's docker-compose.yml).
+MCP_AZURE_SEARCH_URL = settings.MCP_AZURE_SEARCH_URL
+MCP_ZOHO_URL = settings.MCP_ZOHO_URL
 
 T = TypeVar("T")
 
@@ -143,6 +183,94 @@ async def get_cached_lookup_procedure_price(tenant_id: str) -> LookupProcedurePr
     )
 
 
+async def _build_llm(tenant_id: str) -> AzureOpenAILLMAdapter:
+    secrets = EnvFileSecretsAdapter()
+    api_key = await secrets.get_secret(f"azure-openai-api-key-{tenant_id}")
+    llm_config = await _llm_config_repository.get_config(tenant_id)
+
+    client_kwargs = dict(azure_endpoint=llm_config.endpoint, api_key=api_key, api_version=llm_config.api_version)
+    return AzureOpenAILLMAdapter(
+        primary_client=AsyncAzureOpenAI(**client_kwargs),
+        secondary_client=AsyncAzureOpenAI(**client_kwargs),
+        deployment_primary=llm_config.deployment_primary,
+        deployment_secondary=llm_config.deployment_secondary,
+        temperature=llm_config.temperature,
+        max_tokens=llm_config.max_tokens,
+    )
+
+
+async def _build_claude_llm(tenant_id: str) -> ClaudeFoundryLLMAdapter:
+    secrets = EnvFileSecretsAdapter()
+    api_key = await secrets.get_secret(f"azure-foundry-claude-api-key-{tenant_id}")
+    claude_config = await _claude_llm_config_repository.get_config(tenant_id)
+
+    return ClaudeFoundryLLMAdapter(
+        api_key=api_key,
+        endpoint=claude_config.endpoint,
+        deployment=claude_config.deployment,
+        max_tokens=claude_config.max_tokens,
+    )
+
+
+async def _build_conversation_graph_for_tenant(tenant_id: str):
+    # Claude is the completions provider for this agent (Erik's call,
+    # 2026-09-16) -- _build_llm/AzureOpenAILLMAdapter and the "llm" config
+    # block are kept, not removed, since other engines in this codebase
+    # (the legacy run_conversation_with_rag pipeline, and the GPT-4o side of
+    # feature/switch-to-claude's comparison) still use Azure OpenAI directly.
+    llm = await _build_claude_llm(tenant_id)
+    conversation_history = _build_conversation_history()
+    retrieval_tools = McpRetrievalToolsAdapter(
+        mcp_client=McpHttpClient(base_url=MCP_AZURE_SEARCH_URL), tenant_id=tenant_id
+    )
+
+    return build_conversation_graph(
+        llm=llm,
+        conversation_history=conversation_history,
+        reply_language_resolver=ReplyLanguageResolverAdapter(conversation_history=conversation_history),
+        reply_language_enforcer=ReplyLanguageEnforcerAdapter(),
+        translation=AzureTranslatorAdapter(),
+        prompt_config=_prompt_config,
+        retrieval_tools=retrieval_tools,
+        check_business_availability=_check_business_availability,
+        advisor_available_reply_config=_advisor_available_reply_config,
+        agenda_reply_config=_agenda_reply_config,
+        flow_confirmation_reply_config=_flow_confirmation_reply_config,
+        max_history=MAX_HISTORY,
+    )
+
+
+async def get_cached_conversation_graph(tenant_id: str):
+    return await _get_or_build_for_tenant(
+        "langgraph_conversation_graph", tenant_id, lambda: _build_conversation_graph_for_tenant(tenant_id)
+    )
+
+
+def build_langgraph_conversation_engine(
+    *, get_graph: Optional[Callable[[str], Awaitable[object]]] = None
+) -> LangGraphConversationEngineAdapter:
+    """The new agent: orchestrator + 4-branch StateGraph, completions via
+    Claude (Sonnet 5, Microsoft Foundry -- see _build_claude_llm), tools
+    wired via MCP to clinyq-mcp-azure-search, in place of
+    run_conversation_with_rag's Azure 'on your data' + azure_tools.py tool
+    loop. Not the default ConversationEnginePort yet -- pass this into
+    build_process_incoming_message's `conversation_engine` override to try
+    it (see app/test_langgraph_chat.py)."""
+    return LangGraphConversationEngineAdapter(get_graph=get_graph or get_cached_conversation_graph)
+
+
+async def get_cached_mcp_zoho_chat_platform(tenant_id: str) -> McpZohoChatPlatformAdapter:
+    return await _get_or_build_for_tenant(
+        "mcp_zoho_chat_platform",
+        tenant_id,
+        lambda: _build_mcp_zoho_chat_platform(tenant_id),
+    )
+
+
+async def _build_mcp_zoho_chat_platform(tenant_id: str) -> McpZohoChatPlatformAdapter:
+    return McpZohoChatPlatformAdapter(mcp_client=McpHttpClient(base_url=MCP_ZOHO_URL), tenant_id=tenant_id)
+
+
 async def build_process_incoming_message(
     tenant_id: str,
     *,
@@ -152,6 +280,7 @@ async def build_process_incoming_message(
     check_business_availability: Optional[CheckBusinessAvailability] = None,
     get_lookup_procedure_price: Optional[Callable[[str], Awaitable[LookupProcedurePrice]]] = None,
     prompt_config: Optional[PromptConfigRepositoryPort] = None,
+    conversation_engine: Optional[ConversationEnginePort] = None,
 ) -> ProcessIncomingMessage:
     """Wires ProcessIncomingMessage with real adapters for the given tenant.
 
@@ -162,6 +291,11 @@ async def build_process_incoming_message(
     as production would. `chat_platform` and the price-lookup tool (when not
     overridden) are both cached per tenant_id, since this builder runs once
     per incoming chat message.
+
+    `conversation_engine`: when given, replaces AzureOpenAIConversationEngineAdapter
+    entirely (e.g. build_langgraph_conversation_engine()) -- `rag_runner`/
+    `check_business_availability`/`get_lookup_procedure_price`/`prompt_config`
+    are then ignored, since they're that adapter's own construction params.
     """
     with log.operation(tenant_id=tenant_id):
         tenant_repository = FilesystemTenantRepository(config_dir=CONFIG_DIR)
@@ -172,13 +306,14 @@ async def build_process_incoming_message(
 
         conversation_history = _build_conversation_history()
 
-        conversation_engine = AzureOpenAIConversationEngineAdapter(
-            conversation_history=conversation_history,
-            rag_runner=rag_runner,
-            check_business_availability=check_business_availability or _check_business_availability,
-            get_lookup_procedure_price=get_lookup_procedure_price or get_cached_lookup_procedure_price,
-            prompt_config=prompt_config or _prompt_config,
-        )
+        if conversation_engine is None:
+            conversation_engine = AzureOpenAIConversationEngineAdapter(
+                conversation_history=conversation_history,
+                rag_runner=rag_runner,
+                check_business_availability=check_business_availability or _check_business_availability,
+                get_lookup_procedure_price=get_lookup_procedure_price or get_cached_lookup_procedure_price,
+                prompt_config=prompt_config or _prompt_config,
+            )
 
         reply_compressor = LLMReplyCompressionAdapter(compress_fn=compress_fn)
 

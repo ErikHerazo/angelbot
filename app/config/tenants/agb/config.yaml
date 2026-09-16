@@ -1,0 +1,51 @@
+tenant:
+  tenant_id: agb
+  legal_name: "Cosmetic Surgery BCN SLP"
+  trade_name: "Antiaging Group Barcelona"
+  address: "Ronda general Mitre 84"
+  city: "Barcelona"
+  country: "ES"
+  tax_id: "B63819130"
+  timezone: "Europe/Madrid"
+  eu_vat_number: "ESB63819130"
+  default_currency: "EUR"
+
+zoho:
+  server_uri: "salesiq.zoho.eu"
+  screenname: "antiaginggroup"
+
+business_hours:
+  schedule:
+    monday: [["10:30", "14:00"], ["15:30", "19:00"]]
+    tuesday: [["10:30", "14:00"], ["15:30", "19:00"]]
+    wednesday: [["10:30", "14:00"], ["15:30", "19:00"]]
+    thursday: [["10:30", "14:00"], ["15:30", "19:00"]]
+    friday: [["10:30", "14:00"]]
+    saturday: []
+    sunday: []
+
+price_catalog:
+  search_endpoint: "https://agb-search.search.windows.net"
+  index_name: "rag-structured-data-3-large"
+
+search_indexer:
+  search_endpoint: "https://agb-search.search.windows.net"
+  indexer_name: "rag-updated-agb-container-indexer"
+
+llm:
+  endpoint: "https://azure-openai-angelbot-main.openai.azure.com"
+  api_version: "2025-01-01-preview"
+  deployment_primary: gpt-4o-agb
+  deployment_secondary: gpt-4o-mini-secondary
+  temperature: 0.2
+  max_tokens: 1200
+
+# Not the completions provider for the LangGraph agent (that's Claude, see
+# `claude:` below) -- kept here rather than removed, since other engines
+# (the legacy run_conversation_with_rag pipeline, and the GPT-4o side of the
+# /web/chat/test-hexagonal comparison on feature/switch-to-claude) still use
+# Azure OpenAI directly.
+claude:
+  endpoint: "https://foundry-test-clinyq-resource.openai.azure.com/anthropic"
+  deployment: claude-sonnet-5-clinyq
+  max_tokens: 8192

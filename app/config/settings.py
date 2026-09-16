@@ -5,6 +5,21 @@ business config) and SecretsPort (secrets), per the config/secrets/constants
 split agreed early in the hexagonal migration.
 """
 
+import os
+
+import yaml
+
+_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "agent_config.yaml")
+with open(_CONFIG_PATH, "r", encoding="utf-8") as _f:
+    _shared_config = yaml.safe_load(_f)
+
+# LangGraph agent (app/application/use_cases/conversation/) -- shared,
+# non-tenant-specific technical config, same "one YAML with named blocks"
+# structure as config/tenants/{tenant_id}/config.yaml, not hardcoded Python.
+MAX_TOOL_ITERATIONS = _shared_config["retrieval"]["max_tool_iterations"]
+MCP_AZURE_SEARCH_URL = _shared_config["mcp_servers"]["azure_search_url"]
+MCP_ZOHO_URL = _shared_config["mcp_servers"]["zoho_url"]
+
 ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".png", ".jpg", ".csv", ".xlsx"}
 MAX_FILE_SIZE_MB = 10
 ALLOWED_MIME_TYPES = {
