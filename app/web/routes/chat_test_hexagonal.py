@@ -3,7 +3,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Header
 
-from app.composition_root import build_process_incoming_message
+from app.composition_root import build_langgraph_conversation_engine, build_process_incoming_message
 from app.core.logging.structured_logger import get_logger
 from app.web.routes.chat_test import ChatTestRequest, ChatTestResponse
 
@@ -47,6 +47,11 @@ async def chat_test_hexagonal(
     Solo de pruebas, igual que /test: deshabilitado por defecto (404) a
     menos que CHAT_TEST_SECRET esté definido, y requiere el header
     X-Test-Secret con el mismo valor.
+
+    `payload.engine`: "azure_openai" (default, AzureOpenAIConversationEngineAdapter,
+    el pipeline hexagonal de siempre) o "langgraph" (el agente nuevo --
+    orchestrator + 4 ramas, completions vía Claude/Foundry, tools vía MCP,
+    ver CLAUDE.md "LangGraph agent").
     """
     if not CHAT_TEST_SECRET:
         raise HTTPException(status_code=404, detail="Not found")
@@ -54,12 +59,18 @@ async def chat_test_hexagonal(
     if x_test_secret != CHAT_TEST_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    with log.operation(channel=payload.channel):
+    if payload.engine not in ("azure_openai", "langgraph"):
+        raise HTTPException(status_code=422, detail="engine debe ser 'azure_openai' o 'langgraph'")
+
+    with log.operation(channel=payload.channel, engine=payload.engine):
         session_id = payload.session_id or f"test-{uuid.uuid4()}"
         request_id = str(uuid.uuid4())
 
         chat_platform = _CapturingChatPlatform()
-        use_case = await build_process_incoming_message(TENANT_ID, chat_platform=chat_platform)
+        conversation_engine = build_langgraph_conversation_engine() if payload.engine == "langgraph" else None
+        use_case = await build_process_incoming_message(
+            TENANT_ID, chat_platform=chat_platform, conversation_engine=conversation_engine
+        )
 
         await use_case.execute(
             tenant_id=TENANT_ID,

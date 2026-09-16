@@ -40,7 +40,7 @@ def test_success_path_returns_answer_captured_from_process_incoming_message(monk
 
     captured_chat_platform = None
 
-    async def fake_build_process_incoming_message(tenant_id, *, chat_platform):
+    async def fake_build_process_incoming_message(tenant_id, *, chat_platform, conversation_engine=None):
         nonlocal captured_chat_platform
         captured_chat_platform = chat_platform
         return FakeUseCase()
@@ -68,7 +68,7 @@ def test_reuses_provided_session_id(monkeypatch):
 
     chat_platform_holder = {}
 
-    async def fake_build_process_incoming_message(tenant_id, *, chat_platform):
+    async def fake_build_process_incoming_message(tenant_id, *, chat_platform, conversation_engine=None):
         chat_platform_holder["cp"] = chat_platform
         return FakeUseCase()
 
@@ -81,3 +81,43 @@ def test_reuses_provided_session_id(monkeypatch):
     )
 
     assert response.json()["session_id"] == "sess-fixed"
+
+
+def test_returns_422_for_unknown_engine():
+    client = make_client(secret="the-real-secret")
+
+    response = client.post(
+        "/test-hexagonal",
+        json={"message": "hola", "engine": "gpt5"},
+        headers={"X-Test-Secret": "the-real-secret"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_langgraph_engine_passes_built_conversation_engine(monkeypatch):
+    client = make_client(secret="the-real-secret")
+
+    class FakeUseCase:
+        async def execute(self, *, tenant_id, request_id, session_id, user_question, channel, visitor_language=None):
+            await captured["chat_platform"].send_final_response(request_id, "ok")
+
+    captured = {}
+
+    async def fake_build_process_incoming_message(tenant_id, *, chat_platform, conversation_engine=None):
+        captured["chat_platform"] = chat_platform
+        captured["conversation_engine"] = conversation_engine
+        return FakeUseCase()
+
+    fake_engine = object()
+    monkeypatch.setattr(module, "build_process_incoming_message", fake_build_process_incoming_message)
+    monkeypatch.setattr(module, "build_langgraph_conversation_engine", lambda: fake_engine)
+
+    response = client.post(
+        "/test-hexagonal",
+        json={"message": "hola", "engine": "langgraph"},
+        headers={"X-Test-Secret": "the-real-secret"},
+    )
+
+    assert response.status_code == 200
+    assert captured["conversation_engine"] is fake_engine

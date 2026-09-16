@@ -293,9 +293,13 @@ Unit-tested throughout with hand-written fakes, same convention as the rest of t
 
 **Known gap, same shape as elsewhere in this migration**: none of the MCP/Claude/Azure-OpenAI adapters are exercised against real infra in the automated suite (would need real network/secrets) — correctness there was verified via a manual live smoke test instead (`app/test_langgraph_chat.py`, same non-pytest convention as `app/test_hexagonal_chat.py`), which is what surfaced both Claude bugs above.
 
+### Wired into `/web/chat/test-hexagonal` (2026-09-16)
+
+`ChatTestRequest` gained an `engine: str = "azure_openai"` field (same field name/shape `feature/switch-to-claude` independently added for its own GPT-4o-vs-Claude comparison — this branch predates that work, built without seeing it, converged on the same idea); `chat_test_hexagonal.py` validates it's `"azure_openai"` or `"langgraph"` (422 otherwise) and, for `"langgraph"`, passes `conversation_engine=build_langgraph_conversation_engine()` into `build_process_incoming_message`. Verified for real end to end through the actual HTTP layer (`TestClient`, real Claude/Foundry + real `clinyq-mcp-azure-search` + real local Redis, not mocked) — `POST /test-hexagonal` with `{"engine": "langgraph", "message": "cuanto cuesta una liposuccion de abdomen"}` returned 200 with the correct real price. Reconciling this with `feature/switch-to-claude`'s own `engine` selector (which also supports `"claude"`, for the opaque `ClaudeFoundryConversationEngineAdapter`) is a future merge concern, not solved here — the two branches evolved `ChatTestRequest`/`build_process_incoming_message` independently.
+
 ### Known gaps / not yet done
 
-- Not wired into `/web/chat/test-hexagonal` or any live route yet — only reachable via `build_process_incoming_message(..., conversation_engine=build_langgraph_conversation_engine())`, exercised so far only by the manual script and tests. `feature/switch-to-claude`'s `engine` selector on that route doesn't exist on this branch (this branch predates that work) — reconciling the two is a future merge concern, not solved here.
+- Not wired into the real Zoho webhook path — only reachable via `/web/chat/test-hexagonal`'s `engine` field or the manual script, both bypassing Zoho entirely (same as every other hexagonal use case so far).
 - `AzureOpenAILLMAdapter` is built and tested but not exercised against a real Azure OpenAI endpoint end-to-end for this graph (only `ClaudeFoundryLLMAdapter` got the live smoke test, since that's the wired default).
 - No auth on `clinyq-mcp-azure-search`/`clinyq-mcp-zoho` yet (pre-existing gap from that repo, not new here) — fine for local dev, not for a real deployment.
 - `MCP_AZURE_SEARCH_URL`/`MCP_ZOHO_URL` default to `localhost:8931`/`:8932` — both MCP repos default to container port 8931 internally, so running more than one locally at once needs a host-port remap in that repo's `docker-compose.yml`.
