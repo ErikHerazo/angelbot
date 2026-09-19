@@ -17,8 +17,21 @@ with open(_CONFIG_PATH, "r", encoding="utf-8") as _f:
 # non-tenant-specific technical config, same "one YAML with named blocks"
 # structure as config/tenants/{tenant_id}/config.yaml, not hardcoded Python.
 MAX_TOOL_ITERATIONS = _shared_config["retrieval"]["max_tool_iterations"]
-MCP_AZURE_SEARCH_URL = _shared_config["mcp_servers"]["azure_search_url"]
-MCP_ZOHO_URL = _shared_config["mcp_servers"]["zoho_url"]
+# Env var overrides the committed YAML value when set -- needed because
+# agent_config.yaml is one shared file checked into git (currently pointing
+# at the deployed Azure internal URLs for staging), but local dev needs to
+# reach the local docker-compose MCP servers on localhost instead. Every
+# deployed environment (staging/prod) leaves these unset and gets the YAML
+# value as-is.
+MCP_AZURE_SEARCH_URL = os.getenv("MCP_AZURE_SEARCH_URL", _shared_config["mcp_servers"]["azure_search_url"])
+MCP_ZOHO_URL = os.getenv("MCP_ZOHO_URL", _shared_config["mcp_servers"]["zoho_url"])
+
+# Bearer tokens for the 2 clinyq-mcp-* servers above -- secrets, so env vars
+# (never agent_config.yaml), same as every other secret in this codebase.
+# Shared across tenants (this agent is the single known caller of both
+# servers today), unlike SecretsPort's tenant-scoped secrets.
+MCP_AZURE_SEARCH_AUTH_TOKEN = os.getenv("MCP_AZURE_SEARCH_AUTH_TOKEN")
+MCP_ZOHO_AUTH_TOKEN = os.getenv("MCP_ZOHO_AUTH_TOKEN")
 
 ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".png", ".jpg", ".csv", ".xlsx"}
 MAX_FILE_SIZE_MB = 10

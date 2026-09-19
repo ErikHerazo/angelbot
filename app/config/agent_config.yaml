@@ -2,5 +2,5 @@ retrieval:
   max_tool_iterations: 4
 
 mcp_servers:
-  azure_search_url: "http://localhost:8931/mcp"
-  zoho_url: "http://localhost:8932/mcp"
+  azure_search_url: "https://clinyq-mcp-azure-search.internal.thankfulsea-e0e163f9.westus2.azurecontainerapps.io/mcp"
+  zoho_url: "https://clinyq-mcp-zoho.internal.thankfulsea-e0e163f9.westus2.azurecontainerapps.io/mcp"

@@ -23,8 +23,16 @@ class McpHttpClient:
     still send both media types in `Accept` or the server responds 406.
     """
 
-    def __init__(self, *, base_url: str, timeout: float = 15.0, transport: Optional[httpx.AsyncBaseTransport] = None):
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        auth_token: Optional[str] = None,
+        timeout: float = 15.0,
+        transport: Optional[httpx.AsyncBaseTransport] = None,
+    ):
         self._url = base_url.rstrip("/")
+        self._auth_token = auth_token
         self._timeout = timeout
         self._transport = transport
         self._ids = itertools.count(1)
@@ -38,6 +46,8 @@ class McpHttpClient:
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
         }
+        if self._auth_token:
+            headers["Authorization"] = f"Bearer {self._auth_token}"
         try:
             async with httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client:
                 response = await client.post(self._url, json=payload, headers=headers)

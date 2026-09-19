@@ -126,6 +126,8 @@ _flow_confirmation_reply_config = FilesystemFlowConfirmationReplyConfigRepositor
 # remap host ports (see each repo's docker-compose.yml).
 MCP_AZURE_SEARCH_URL = settings.MCP_AZURE_SEARCH_URL
 MCP_ZOHO_URL = settings.MCP_ZOHO_URL
+MCP_AZURE_SEARCH_AUTH_TOKEN = settings.MCP_AZURE_SEARCH_AUTH_TOKEN
+MCP_ZOHO_AUTH_TOKEN = settings.MCP_ZOHO_AUTH_TOKEN
 
 T = TypeVar("T")
 
@@ -261,7 +263,8 @@ async def _build_conversation_graph_for_tenant(tenant_id: str):
     llm = await _build_claude_llm(tenant_id)
     conversation_history = _build_conversation_history()
     retrieval_tools = McpRetrievalToolsAdapter(
-        mcp_client=McpHttpClient(base_url=MCP_AZURE_SEARCH_URL), tenant_id=tenant_id
+        mcp_client=McpHttpClient(base_url=MCP_AZURE_SEARCH_URL, auth_token=MCP_AZURE_SEARCH_AUTH_TOKEN),
+        tenant_id=tenant_id,
     )
 
     return build_conversation_graph(
@@ -308,7 +311,9 @@ async def get_cached_mcp_zoho_chat_platform(tenant_id: str) -> McpZohoChatPlatfo
 
 
 async def _build_mcp_zoho_chat_platform(tenant_id: str) -> McpZohoChatPlatformAdapter:
-    return McpZohoChatPlatformAdapter(mcp_client=McpHttpClient(base_url=MCP_ZOHO_URL), tenant_id=tenant_id)
+    return McpZohoChatPlatformAdapter(
+        mcp_client=McpHttpClient(base_url=MCP_ZOHO_URL, auth_token=MCP_ZOHO_AUTH_TOKEN), tenant_id=tenant_id
+    )
 
 
 async def build_process_incoming_message(
