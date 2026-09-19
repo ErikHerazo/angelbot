@@ -6,6 +6,9 @@ from app.services.chat.parsers.salesiq_parser import parse_zoho_sales_payload
 from app.services.chat.source_detector import detect_zoho_source
 from app.services.chat.parsers.flow_parser import parse_zoho_flow_payload
 from app.services.chat.chat_event_router import route_chat_event
+from app.core.logging.structured_logger import get_logger
+
+log = get_logger(__name__)
 
 
 async def dispatch_zoho_webhook(request: Request):
@@ -32,6 +35,8 @@ async def dispatch_zoho_webhook(request: Request):
             event = parse_zoho_sales_payload(body_json)
         else:
             event = parse_zoho_flow_payload(body_json)
+
+        log.info("Zoho webhook received", source=source, event_type=event.event_type, request_id=event.request_id)
 
         return await route_chat_event(event)
 

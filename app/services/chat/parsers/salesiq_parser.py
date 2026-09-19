@@ -1,5 +1,8 @@
 from app.services.chat.models.event import ChatEvent
 from app.core import constants
+from app.core.logging.structured_logger import get_logger
+
+log = get_logger(__name__)
 
 
 def parse_zoho_sales_payload(body: dict) -> ChatEvent:
@@ -28,11 +31,15 @@ def parse_zoho_sales_payload(body: dict) -> ChatEvent:
         user_message = message["text"]
     else:
         user_message = None
-    print("HANDLER:", handler)
-    print("VISITOR_ID:", visitor.get("visitor_id"))
-    print("NAME:", visitor.get("name"))
-    print("EMAIL:", visitor.get("email"))
-    print("PHONE:", visitor.get("phone"))
+    log.info(
+        "SalesIQ webhook parsed",
+        request_id=request_id,
+        handler=handler,
+        visitor_id=visitor.get("visitor_id"),
+        visitor_name=visitor.get("name"),
+        visitor_email=visitor.get("email"),
+        visitor_phone=visitor.get("phone"),
+    )
     return ChatEvent(
         source="salesiq",
         event_type=handler,

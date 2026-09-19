@@ -1,4 +1,5 @@
 import logging
+import os
 from app.core import constants
 from app.services.cache.session_memory import SessionMemoryRedis
 from app.core.utils.count_visible_chars import count_visible_chars
@@ -10,6 +11,24 @@ MAX_HISTORY = 6
 char_limit = constants.INSTAGRAM_CHARACTER_LIMIT
 
 logger = logging.getLogger(__name__)
+
+# Dev/testing only, off by default: skips send_final_response so a real Zoho
+# callback stays open indefinitely (e.g. to call it manually via Postman
+# against clinyq-mcp-zoho without racing this pipeline's own auto-response).
+# Never set this in a real deployment -- it means real users never get an
+# answer. Read once at import time, same as every other module-level config
+# constant in this codebase.
+ZOHO_DISABLE_FINAL_RESPONSE = os.getenv("ZOHO_DISABLE_FINAL_RESPONSE", "false").lower() == "true"
+
+
+async def _send_final_response(zoho_client, *, request_id: str, answer_text: str):
+    if ZOHO_DISABLE_FINAL_RESPONSE:
+        logger.warning(
+            "ZOHO_DISABLE_FINAL_RESPONSE=true -- send_final_response skipped, callback left open",
+            extra={"request_id": request_id},
+        )
+        return
+    await zoho_client.send_final_response(request_id=request_id, answer_text=answer_text)
 
 async def process_zoho_message(
     *,
@@ -32,11 +51,8 @@ async def process_zoho_message(
         print("===== Longitud aproximada de la respuesta inicial: ", len(answer))
     except Exception:
         logger.exception("RAG failed", extra={"request_id": request_id})
-    
-        await zoho_client.send_final_response(
-            request_id=request_id,
-            answer_text=constants.FALLBACK_MESSAGE,
-        )
+
+        await _send_final_response(zoho_client, request_id=request_id, answer_text=constants.FALLBACK_MESSAGE)
         return
     
     # FALLBACK
@@ -80,7 +96,4 @@ async def process_zoho_message(
                 extra={"request_id": request_id, "session_id": session_id},
             )
 
-    await zoho_client.send_final_response(
-        request_id=request_id,
-        answer_text=answer,
-    )
+    await _send_final_response(zoho_client, request_id=request_id, answer_text=answer)
