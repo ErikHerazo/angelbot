@@ -112,6 +112,7 @@ class AzureOpenAILLMAdapter:
                 **kwargs,
             )
 
+        log.debug("Azure OpenAI request", message_count=len(messages), tool_names=[t["function"]["name"] for t in (tools or [])])
         if self._can_try_primary():
             try:
                 response = await request(self._primary_client, self._deployment_primary)
@@ -128,7 +129,14 @@ class AzureOpenAILLMAdapter:
             log.info("Using SECONDARY", reason="primary_in_cooldown")
             response = await request(self._secondary_client, self._deployment_secondary)
 
-        return self._to_completion(response)
+        completion = self._to_completion(response)
+        log.debug(
+            "Azure OpenAI completion",
+            finish_reason=getattr(response.choices[0], "finish_reason", None),
+            content=completion.get("content"),
+            tool_calls=[tc["name"] for tc in (completion.get("tool_calls") or [])],
+        )
+        return completion
 
     @staticmethod
     def _to_completion(response: Any) -> LLMCompletion:

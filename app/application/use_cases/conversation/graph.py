@@ -24,6 +24,7 @@ from app.application.use_cases.conversation.agents.retrieval_agent import (
     make_generate_with_tools_node,
     make_translate_query_node,
     route_after_generate,
+    use_existing_answer_node,
 )
 from app.application.use_cases.conversation.nodes import (
     make_enforce_language_node,
@@ -68,6 +69,7 @@ def build_conversation_graph(
     )
     graph.add_node("execute_tools", make_execute_tools_node(retrieval_tools))
     graph.add_node("generate_final", make_generate_final_node(llm=llm, retrieval_tools=retrieval_tools))
+    graph.add_node("use_existing_answer", use_existing_answer_node)
     graph.add_node("agenda_agent", make_agenda_agent_node(agenda_reply_config))
     graph.add_node("direct_agent", make_direct_agent_node(advisor_available_reply_config))
     graph.add_node("flow_agent", make_flow_agent_node(flow_confirmation_reply_config))
@@ -85,10 +87,15 @@ def build_conversation_graph(
     graph.add_conditional_edges(
         "generate_with_tools",
         route_after_generate,
-        {"execute_tools": "execute_tools", "generate_final": "generate_final"},
+        {
+            "execute_tools": "execute_tools",
+            "generate_final": "generate_final",
+            "use_existing_answer": "use_existing_answer",
+        },
     )
     graph.add_edge("execute_tools", "generate_with_tools")
     graph.add_edge("generate_final", "enforce_language")
+    graph.add_edge("use_existing_answer", "enforce_language")
     graph.add_edge("agenda_agent", "enforce_language")
     graph.add_edge("direct_agent", "enforce_language")
     graph.add_edge("flow_agent", "enforce_language")

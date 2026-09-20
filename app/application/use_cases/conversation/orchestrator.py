@@ -48,9 +48,11 @@ def make_orchestrator_node(
                 {"role": "user", "content": state["user_question"]},
             ]
 
+            log.debug("orchestrator_node: classification request", messages=messages)
             completion = await llm.complete(
                 messages=messages, tools=[CLASSIFY_INTENT_TOOL], tool_choice=_FORCE_CLASSIFY_INTENT
             )
+            log.debug("orchestrator_node: classification response", completion=completion)
 
             intent = "info_general"
             tool_calls = completion.get("tool_calls")
