@@ -72,7 +72,9 @@ def build_conversation_graph(
     graph.add_node("use_existing_answer", use_existing_answer_node)
     graph.add_node("agenda_agent", make_agenda_agent_node(agenda_reply_config))
     graph.add_node("direct_agent", make_direct_agent_node(advisor_available_reply_config))
-    graph.add_node("flow_agent", make_flow_agent_node(flow_confirmation_reply_config))
+    graph.add_node(
+        "flow_agent", make_flow_agent_node(llm=llm, flow_confirmation_reply_config=flow_confirmation_reply_config)
+    )
     graph.add_node("enforce_language", make_enforce_language_node(reply_language_enforcer))
 
     graph.set_entry_point("load_history")

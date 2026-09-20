@@ -17,10 +17,10 @@ def _tool_call_response(intent: str, call_id="c1"):
     return {"content": None, "tool_calls": [{"id": call_id, "name": "classify_intent", "arguments": {"intent": intent}}]}
 
 
-def _build_graph(*, llm, check_available=True, retrieval_call_result=None):
+def _build_graph(*, llm, check_available=True, retrieval_call_result=None, conversation_history=None):
     return build_conversation_graph(
         llm=llm,
-        conversation_history=FakeConversationHistory(),
+        conversation_history=conversation_history or FakeConversationHistory(),
         reply_language_resolver=FakeReplyLanguageResolver(),
         reply_language_enforcer=FakeReplyLanguageEnforcer(),
         translation=FakeTranslation(),
@@ -147,6 +147,33 @@ async def test_route_flow_when_advisor_unavailable():
 
     assert result["route"] == "flow"
     assert result["final_answer"] == "confirma tus datos"
+    # No history yet -- must not call the LLM at all, just the canned reply.
+    assert len(llm.calls) == 1
+
+
+async def test_route_flow_reuses_contact_info_already_given_in_history():
+    # Bug found live 2026-09-19/20: flow_agent used to always repeat the same
+    # canned "give me your name/email/phone" text even after the user had
+    # already provided it earlier in the conversation. Once there's history,
+    # flow_agent must ask the LLM to check it instead of blindly repeating.
+    state = _initial_state("mi nombre es Juan, mi correo es juan@test.com y mi telefono es 123")
+    history = FakeConversationHistory(
+        history=[
+            {"role": "assistant", "content": "confirma tus datos"},
+        ]
+    )
+    llm = FakeLLM(
+        [
+            _tool_call_response("hablar_con_asesor"),
+            {"content": "Gracias Juan, derivaremos tu caso a un asesor.", "tool_calls": None},  # flow_agent check
+        ]
+    )
+    graph = _build_graph(llm=llm, check_available=False, conversation_history=history)
+
+    result = await graph.ainvoke(state)
+
+    assert result["route"] == "flow"
+    assert result["final_answer"] == "Gracias Juan, derivaremos tu caso a un asesor."
 
 
 async def test_defaults_to_info_general_when_no_tool_call_returned():
