@@ -16,6 +16,7 @@ log = get_logger(__name__)
 def make_translate_query_node(translation: TranslationPort) -> NodeFn:
     async def translate_query_node(state: ConversationState) -> dict:
         translated = await translation.translate(state["user_question"], from_lang=None, to_lang="es")
+        log.debug("Translated query for retrieval", original=state["user_question"], translated=translated)
         return {"translated_query": translated}
 
     return translate_query_node
@@ -39,7 +40,13 @@ def make_generate_with_tools_node(
             ]
 
         tool_schemas = await retrieval_tools.get_tool_schemas()
+        log.debug("generate_with_tools: sending completion request", message_count=len(messages))
         completion = await llm.complete(messages=messages, tools=tool_schemas, tool_choice="auto")
+        log.debug(
+            "generate_with_tools: completion received",
+            content=completion.get("content"),
+            tool_calls=[tc["name"] for tc in (completion.get("tool_calls") or [])],
+        )
 
         assistant_message: dict = {"role": "assistant", "content": completion.get("content")}
         if completion.get("tool_calls"):
@@ -69,15 +76,18 @@ def make_execute_tools_node(retrieval_tools: RetrievalToolsProviderPort) -> Node
             try:
                 result = await retrieval_tools.call_tool(name, arguments)
                 content = json.dumps(result)
+                log.debug("execute_tools: tool succeeded", tool_name=name, arguments=arguments, result=result)
             except Exception as exc:
                 log.warning("Retrieval tool call failed", tool_name=name, error_type=type(exc).__name__)
                 content = json.dumps({"error": str(exc)})
 
             tool_results.append({"role": "tool", "tool_call_id": tool_call["id"], "content": content})
 
+        new_count = state.get("tool_call_count", 0) + 1
+        log.info("execute_tools: iteration complete", iteration=new_count, tools_called=len(tool_results))
         return {
             "messages": messages + tool_results,
-            "tool_call_count": state.get("tool_call_count", 0) + 1,
+            "tool_call_count": new_count,
         }
 
     return execute_tools_node
@@ -87,7 +97,16 @@ def route_after_generate(state: ConversationState) -> str:
     last_message = state["messages"][-1]
     has_tool_calls = bool(last_message.get("tool_calls"))
     under_limit = state.get("tool_call_count", 0) < MAX_TOOL_ITERATIONS
-    return "execute_tools" if (has_tool_calls and under_limit) else "generate_final"
+    route = "execute_tools" if (has_tool_calls and under_limit) else "generate_final"
+    if has_tool_calls and not under_limit:
+        log.warning(
+            "route_after_generate: hit MAX_TOOL_ITERATIONS with pending tool calls, forcing generate_final",
+            tool_call_count=state.get("tool_call_count", 0),
+            max_tool_iterations=MAX_TOOL_ITERATIONS,
+        )
+    else:
+        log.debug("route_after_generate: routing", route=route, has_tool_calls=has_tool_calls)
+    return route
 
 
 def make_generate_final_node(*, llm: LLMPort, retrieval_tools: RetrievalToolsProviderPort) -> NodeFn:
@@ -118,12 +137,16 @@ def make_generate_final_node(*, llm: LLMPort, retrieval_tools: RetrievalToolsPro
             ),
         }
         messages = state["messages"] + [reinforcement]
+        log.debug("generate_final: messages sent for final answer", messages=messages)
 
         # tool_choice="none" prevents further calls, but `tools` is still passed
         # (same as the legacy make_completion.py's force_text path) rather than
         # omitted, matching known-working production behavior.
         tool_schemas = await retrieval_tools.get_tool_schemas()
         completion = await llm.complete(messages=messages, tools=tool_schemas, tool_choice="none")
-        return {"final_answer": completion.get("content") or ""}
+        final_answer = completion.get("content") or ""
+        log.info("generate_final: final answer generated", answer_length=len(final_answer))
+        log.debug("generate_final: final answer content", final_answer=final_answer)
+        return {"final_answer": final_answer}
 
     return generate_final_node

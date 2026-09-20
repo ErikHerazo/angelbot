@@ -1,6 +1,9 @@
 from typing import Any
 
 from app.adapters.outbound.mcp.mcp_http_client import McpHttpClient
+from app.core.logging.structured_logger import get_logger
+
+log = get_logger(__name__)
 
 
 class McpRetrievalToolsAdapter:
@@ -20,6 +23,7 @@ class McpRetrievalToolsAdapter:
 
     async def get_tool_schemas(self) -> list[dict]:
         tools = await self._client.list_tools()
+        log.debug("Fetched MCP tool schemas", tenant_id=self._tenant_id, tool_names=[t["name"] for t in tools])
         return [self._to_openai_schema(tool) for tool in tools]
 
     def _to_openai_schema(self, tool: dict) -> dict:
@@ -45,4 +49,7 @@ class McpRetrievalToolsAdapter:
         }
 
     async def call_tool(self, name: str, arguments: dict) -> Any:
-        return await self._client.call_tool(name, {**arguments, "tenant_id": self._tenant_id})
+        log.debug("Calling MCP retrieval tool", tenant_id=self._tenant_id, tool_name=name, arguments=arguments)
+        result = await self._client.call_tool(name, {**arguments, "tenant_id": self._tenant_id})
+        log.debug("MCP retrieval tool result", tenant_id=self._tenant_id, tool_name=name, result=result)
+        return result

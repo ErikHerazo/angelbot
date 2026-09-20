@@ -74,9 +74,17 @@ class ClaudeFoundryLLMAdapter:
         claude_tools = [self._to_claude_tool(t) for t in tools] if tools else []
         claude_tool_choice = self._to_claude_tool_choice(tool_choice)
 
+        log.debug(
+            "Claude request",
+            system=system,
+            messages=claude_messages,
+            tool_names=[t.get("name") for t in claude_tools],
+            tool_choice=claude_tool_choice,
+        )
         response = await self._messages_create_fn(
             system=system, messages=claude_messages, tools=claude_tools, tool_choice=claude_tool_choice
         )
+        log.debug("Claude response", stop_reason=response.stop_reason, content_blocks=[b.type for b in response.content])
 
         if response.stop_reason == "max_tokens":
             log.warning("Claude stopped at max_tokens -- text may be truncated or empty")
