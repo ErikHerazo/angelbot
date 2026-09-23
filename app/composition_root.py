@@ -80,6 +80,9 @@ from app.adapters.outbound.tenant_config.filesystem_flow_confirmation_reply_conf
 from app.adapters.outbound.tenant_config.filesystem_llm_config_repository import (
     FilesystemLLMConfigRepository,
 )
+from app.adapters.outbound.tenant_config.filesystem_pectus_poland_disambiguation_config_repository import (
+    FilesystemPectusPolandDisambiguationConfigRepository,
+)
 from app.application.ports.chat_platform_port import ChatPlatformPort
 from app.application.ports.conversation_engine_port import ConversationEnginePort
 from app.application.ports.prompt_config_repository_port import PromptConfigRepositoryPort
@@ -117,6 +120,7 @@ _llm_config_repository = FilesystemLLMConfigRepository(config_dir=CONFIG_DIR)
 _claude_llm_config_repository = FilesystemClaudeLLMConfigRepository(config_dir=CONFIG_DIR)
 _advisor_available_reply_config = FilesystemAdvisorAvailableReplyConfigRepository(config_dir=CONFIG_DIR)
 _agenda_reply_config = FilesystemAgendaReplyConfigRepository(config_dir=CONFIG_DIR)
+_pectus_poland_disambiguation_config = FilesystemPectusPolandDisambiguationConfigRepository(config_dir=CONFIG_DIR)
 _flow_confirmation_reply_config = FilesystemFlowConfirmationReplyConfigRepository(config_dir=CONFIG_DIR)
 
 # clinyq-mcp-* server locations -- shared infra, not tenant config (tenant_id
@@ -279,6 +283,7 @@ async def _build_conversation_graph_for_tenant(tenant_id: str):
         advisor_available_reply_config=_advisor_available_reply_config,
         agenda_reply_config=_agenda_reply_config,
         flow_confirmation_reply_config=_flow_confirmation_reply_config,
+        pectus_poland_disambiguation_config=_pectus_poland_disambiguation_config,
         max_history=MAX_HISTORY,
     )
 

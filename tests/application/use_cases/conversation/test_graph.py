@@ -30,6 +30,7 @@ def _build_graph(*, llm, check_available=True, retrieval_call_result=None, conve
         advisor_available_reply_config=FakeCannedReplyConfig("habla con un asesor"),
         agenda_reply_config=FakeCannedReplyConfig("agenda aqui"),
         flow_confirmation_reply_config=FakeCannedReplyConfig("confirma tus datos"),
+        pectus_poland_disambiguation_config=FakeCannedReplyConfig("¿centro del pecho o un lado?"),
         max_history=6,
     )
 

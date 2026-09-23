@@ -9,6 +9,9 @@ from app.application.ports.flow_confirmation_reply_config_repository_port import
     FlowConfirmationReplyConfigRepositoryPort,
 )
 from app.application.ports.llm_port import LLMPort
+from app.application.ports.pectus_poland_disambiguation_config_repository_port import (
+    PectusPolandDisambiguationConfigRepositoryPort,
+)
 from app.application.ports.prompt_config_repository_port import PromptConfigRepositoryPort
 from app.application.ports.reply_language_enforcer_port import ReplyLanguageEnforcerPort
 from app.application.ports.reply_language_resolver_port import ReplyLanguageResolverPort
@@ -32,6 +35,10 @@ from app.application.use_cases.conversation.nodes import (
     make_resolve_language_node,
 )
 from app.application.use_cases.conversation.orchestrator import make_orchestrator_node, route_after_orchestrator
+from app.application.use_cases.conversation.pectus_poland_guard import (
+    make_pectus_poland_guard_node,
+    route_after_pectus_poland_guard,
+)
 from app.application.use_cases.conversation.state import ConversationState
 
 
@@ -48,6 +55,7 @@ def build_conversation_graph(
     advisor_available_reply_config: AdvisorAvailableReplyConfigRepositoryPort,
     agenda_reply_config: AgendaReplyConfigRepositoryPort,
     flow_confirmation_reply_config: FlowConfirmationReplyConfigRepositoryPort,
+    pectus_poland_disambiguation_config: PectusPolandDisambiguationConfigRepositoryPort,
     max_history: int,
 ):
     """Builds the orchestrator + 4-branch conversation StateGraph (retrieval /
@@ -63,6 +71,9 @@ def build_conversation_graph(
         make_orchestrator_node(llm=llm, check_business_availability=check_business_availability),
     )
     graph.add_node("translate_query", make_translate_query_node(translation))
+    graph.add_node(
+        "pectus_poland_guard", make_pectus_poland_guard_node(pectus_poland_disambiguation_config)
+    )
     graph.add_node(
         "generate_with_tools",
         make_generate_with_tools_node(llm=llm, prompt_config=prompt_config, retrieval_tools=retrieval_tools),
@@ -85,7 +96,12 @@ def build_conversation_graph(
         route_after_orchestrator,
         {"retrieval": "translate_query", "agenda": "agenda_agent", "direct": "direct_agent", "flow": "flow_agent"},
     )
-    graph.add_edge("translate_query", "generate_with_tools")
+    graph.add_edge("translate_query", "pectus_poland_guard")
+    graph.add_conditional_edges(
+        "pectus_poland_guard",
+        route_after_pectus_poland_guard,
+        {"enforce_language": "enforce_language", "generate_with_tools": "generate_with_tools"},
+    )
     graph.add_conditional_edges(
         "generate_with_tools",
         route_after_generate,

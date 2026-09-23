@@ -23,5 +23,8 @@ class ConversationState(TypedDict, total=False):
     messages: list[dict]
     tool_call_count: int
 
+    # Set by pectus_poland_guard_node.
+    pectus_poland_guard_triggered: bool
+
     # Output.
     final_answer: str
