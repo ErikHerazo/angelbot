@@ -58,12 +58,16 @@ def _make_adapter(
     search_main_index=None,
     translate_fn=None,
     resolve_reply_language_fn=None,
+    enforce_reply_language_fn=None,
     messages_create_fn=None,
     check_business_availability=None,
     get_lookup_procedure_price=None,
 ):
     async def default_resolve_reply_language(session_id, current_message=None, language_hint=None, history=None):
         return "es"
+
+    async def default_enforce_reply_language(answer, reply_language):
+        return answer
 
     async def default_search_price_list(query):
         return []
@@ -81,6 +85,7 @@ def _make_adapter(
         search_main_index=search_main_index or default_search_main_index,
         translate_fn=translate_fn,
         resolve_reply_language_fn=resolve_reply_language_fn or default_resolve_reply_language,
+        enforce_reply_language_fn=enforce_reply_language_fn or default_enforce_reply_language,
         messages_create_fn=messages_create_fn or default_messages_create_fn,
         check_business_availability=check_business_availability,
         get_lookup_procedure_price=get_lookup_procedure_price,
@@ -142,6 +147,35 @@ async def test_formats_prompt_with_resolved_reply_language():
     )
 
     assert captured["system"] == "Reply in Inglés."
+
+
+async def test_runs_answer_through_enforce_reply_language_before_returning():
+    captured = {}
+
+    async def fake_resolve_reply_language(session_id, current_message=None, language_hint=None, history=None):
+        return "en"
+
+    async def fake_enforce_reply_language(answer, reply_language):
+        captured["answer"] = answer
+        captured["reply_language"] = reply_language
+        return "corrected answer"
+
+    async def fake_messages_create_fn(*, system, messages, tools):
+        return text_response("respuesta que salió en el idioma equivocado")
+
+    adapter = _make_adapter(
+        resolve_reply_language_fn=fake_resolve_reply_language,
+        enforce_reply_language_fn=fake_enforce_reply_language,
+        messages_create_fn=fake_messages_create_fn,
+    )
+
+    answer = await adapter.generate_reply(
+        tenant_id="agb", session_id="sess-1", user_question="hi", channel="website"
+    )
+
+    assert captured["answer"] == "respuesta que salió en el idioma equivocado"
+    assert captured["reply_language"] == "en"
+    assert answer == "corrected answer"
 
 
 async def test_translates_question_before_searching_when_reply_language_is_not_spanish():

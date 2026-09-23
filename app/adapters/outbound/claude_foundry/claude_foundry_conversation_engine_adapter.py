@@ -184,6 +184,7 @@ class ClaudeFoundryConversationEngineAdapter:
         search_main_index: Optional[Callable[[str], Awaitable[list[str]]]] = None,
         translate_fn: Optional[Callable[..., Awaitable[str]]] = None,
         resolve_reply_language_fn: Optional[Callable[..., Awaitable[str]]] = None,
+        enforce_reply_language_fn: Optional[Callable[..., Awaitable[str]]] = None,
         messages_create_fn: Optional[Callable[..., Awaitable[object]]] = None,
         max_tokens: int = 8192,
     ):
@@ -215,6 +216,12 @@ class ClaudeFoundryConversationEngineAdapter:
 
             resolve_reply_language_fn = resolve_reply_language
         self._resolve_reply_language_fn = resolve_reply_language_fn
+
+        if enforce_reply_language_fn is None:
+            from app.core.utils.enforce_reply_language import enforce_reply_language
+
+            enforce_reply_language_fn = enforce_reply_language
+        self._enforce_reply_language_fn = enforce_reply_language_fn
 
         if messages_create_fn is None:
             from anthropic import AsyncAnthropicFoundry
@@ -431,4 +438,16 @@ class ClaudeFoundryConversationEngineAdapter:
             # notebook, 2026-09-07.
             answer = next((b.text for b in response.content if b.type == "text"), "") if response else ""
             log.debug("messages_create_fn returned", answer_length=len(answer) if answer else 0)
+
+            # Última barrera antes de devolver la respuesta: a diferencia de
+            # AzureOpenAIConversationEngineAdapter (que ya corría esto vía
+            # run_conversation_with_rag), este adapter devolvía el texto de
+            # Claude sin pasar por enforce_reply_language -- si la propia
+            # generación de Claude derivaba a un idioma equivocado (bug real
+            # encontrado en pruebas ciegas: "Y laser?" en ES respondido en
+            # galés, "I have bags under my eyes" respondido en danés/noruego,
+            # pese a que reply_language se resolvía correctamente), nada lo
+            # corregía antes de llegar al paciente. Ver memoria
+            # agb_claude_v2_test_round_20260914 / agb_sticky_session_language_fix_20260922.
+            answer = await self._enforce_reply_language_fn(answer, reply_language)
             return answer
