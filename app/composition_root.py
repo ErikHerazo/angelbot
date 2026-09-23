@@ -80,6 +80,9 @@ from app.adapters.outbound.tenant_config.filesystem_flow_confirmation_reply_conf
 from app.adapters.outbound.tenant_config.filesystem_llm_config_repository import (
     FilesystemLLMConfigRepository,
 )
+from app.adapters.outbound.tenant_config.filesystem_minor_patient_deferral_config_repository import (
+    FilesystemMinorPatientDeferralConfigRepository,
+)
 from app.adapters.outbound.tenant_config.filesystem_pectus_poland_disambiguation_config_repository import (
     FilesystemPectusPolandDisambiguationConfigRepository,
 )
@@ -121,6 +124,7 @@ _claude_llm_config_repository = FilesystemClaudeLLMConfigRepository(config_dir=C
 _advisor_available_reply_config = FilesystemAdvisorAvailableReplyConfigRepository(config_dir=CONFIG_DIR)
 _agenda_reply_config = FilesystemAgendaReplyConfigRepository(config_dir=CONFIG_DIR)
 _pectus_poland_disambiguation_config = FilesystemPectusPolandDisambiguationConfigRepository(config_dir=CONFIG_DIR)
+_minor_patient_deferral_config = FilesystemMinorPatientDeferralConfigRepository(config_dir=CONFIG_DIR)
 _flow_confirmation_reply_config = FilesystemFlowConfirmationReplyConfigRepository(config_dir=CONFIG_DIR)
 
 # clinyq-mcp-* server locations -- shared infra, not tenant config (tenant_id
@@ -284,6 +288,7 @@ async def _build_conversation_graph_for_tenant(tenant_id: str):
         agenda_reply_config=_agenda_reply_config,
         flow_confirmation_reply_config=_flow_confirmation_reply_config,
         pectus_poland_disambiguation_config=_pectus_poland_disambiguation_config,
+        minor_patient_deferral_config=_minor_patient_deferral_config,
         max_history=MAX_HISTORY,
     )
 

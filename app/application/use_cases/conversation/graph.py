@@ -9,6 +9,9 @@ from app.application.ports.flow_confirmation_reply_config_repository_port import
     FlowConfirmationReplyConfigRepositoryPort,
 )
 from app.application.ports.llm_port import LLMPort
+from app.application.ports.minor_patient_deferral_config_repository_port import (
+    MinorPatientDeferralConfigRepositoryPort,
+)
 from app.application.ports.pectus_poland_disambiguation_config_repository_port import (
     PectusPolandDisambiguationConfigRepositoryPort,
 )
@@ -34,6 +37,10 @@ from app.application.use_cases.conversation.nodes import (
     make_load_history_node,
     make_resolve_language_node,
 )
+from app.application.use_cases.conversation.minor_patient_guard import (
+    make_minor_patient_guard_node,
+    route_after_minor_patient_guard,
+)
 from app.application.use_cases.conversation.orchestrator import make_orchestrator_node, route_after_orchestrator
 from app.application.use_cases.conversation.pectus_poland_guard import (
     make_pectus_poland_guard_node,
@@ -56,6 +63,7 @@ def build_conversation_graph(
     agenda_reply_config: AgendaReplyConfigRepositoryPort,
     flow_confirmation_reply_config: FlowConfirmationReplyConfigRepositoryPort,
     pectus_poland_disambiguation_config: PectusPolandDisambiguationConfigRepositoryPort,
+    minor_patient_deferral_config: MinorPatientDeferralConfigRepositoryPort,
     max_history: int,
 ):
     """Builds the orchestrator + 4-branch conversation StateGraph (retrieval /
@@ -71,6 +79,9 @@ def build_conversation_graph(
         make_orchestrator_node(llm=llm, check_business_availability=check_business_availability),
     )
     graph.add_node("translate_query", make_translate_query_node(translation))
+    graph.add_node(
+        "minor_patient_guard", make_minor_patient_guard_node(minor_patient_deferral_config)
+    )
     graph.add_node(
         "pectus_poland_guard", make_pectus_poland_guard_node(pectus_poland_disambiguation_config)
     )
@@ -96,7 +107,12 @@ def build_conversation_graph(
         route_after_orchestrator,
         {"retrieval": "translate_query", "agenda": "agenda_agent", "direct": "direct_agent", "flow": "flow_agent"},
     )
-    graph.add_edge("translate_query", "pectus_poland_guard")
+    graph.add_edge("translate_query", "minor_patient_guard")
+    graph.add_conditional_edges(
+        "minor_patient_guard",
+        route_after_minor_patient_guard,
+        {"enforce_language": "enforce_language", "pectus_poland_guard": "pectus_poland_guard"},
+    )
     graph.add_conditional_edges(
         "pectus_poland_guard",
         route_after_pectus_poland_guard,

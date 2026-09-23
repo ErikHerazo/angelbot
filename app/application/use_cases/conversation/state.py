@@ -26,5 +26,8 @@ class ConversationState(TypedDict, total=False):
     # Set by pectus_poland_guard_node.
     pectus_poland_guard_triggered: bool
 
+    # Set by minor_patient_guard_node.
+    minor_patient_guard_triggered: bool
+
     # Output.
     final_answer: str

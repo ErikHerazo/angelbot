@@ -31,6 +31,7 @@ def _build_graph(*, llm, check_available=True, retrieval_call_result=None, conve
         agenda_reply_config=FakeCannedReplyConfig("agenda aqui"),
         flow_confirmation_reply_config=FakeCannedReplyConfig("confirma tus datos"),
         pectus_poland_disambiguation_config=FakeCannedReplyConfig("¿centro del pecho o un lado?"),
+        minor_patient_deferral_config=FakeCannedReplyConfig("hay que valorarlo con un especialista"),
         max_history=6,
     )
 
