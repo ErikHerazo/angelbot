@@ -26,6 +26,18 @@ class ClaudeFoundryLLMAdapter:
     "Reliability fixes from a partner's blind comparison test") was traced
     to a too-small max_tokens silently starving the text block. Reusing the
     already-validated value here, not re-deriving it.
+
+    No `temperature` control: tried adding one (mirroring AzureOpenAILLMAdapter's
+    already-tuned `temperature=0.2`, to fix a live-reproduced run-to-run
+    tool-calling/disambiguation-adherence inconsistency), but confirmed live
+    that this SDK's `AsyncMessages.create` (both `AsyncAnthropicFoundry` and
+    plain `AsyncAnthropic`, this SDK version) does not accept `temperature`,
+    `top_p` or `top_k` at all -- not Foundry-specific, and consistent with
+    this deployment's extended thinking being mandatory/default-on for this
+    model family (Anthropic requires `temperature=1` when thinking is
+    enabled, so the API surface likely omits the knob entirely rather than
+    accept-and-ignore it). No inference-level determinism lever available
+    here; see CLAUDE.md/memory for what was tried instead.
     """
 
     def __init__(
