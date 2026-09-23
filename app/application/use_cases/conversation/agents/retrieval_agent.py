@@ -5,6 +5,7 @@ from app.application.ports.llm_port import LLMPort
 from app.application.ports.prompt_config_repository_port import PromptConfigRepositoryPort
 from app.application.ports.retrieval_tools_provider_port import RetrievalToolsProviderPort
 from app.application.ports.translation_port import TranslationPort
+from app.application.use_cases.conversation.age_signal import age_reinforcement_note
 from app.application.use_cases.conversation.nodes import NodeFn
 from app.application.use_cases.conversation.state import ConversationState
 from app.config.settings import MAX_TOOL_ITERATIONS
@@ -33,6 +34,16 @@ def make_generate_with_tools_node(
         if messages is None:
             base_prompt = await prompt_config.get_base_prompt(state["tenant_id"], state["channel"])
             system_prompt = base_prompt.format(reply_language=state["reply_language"])
+
+            # Banda 16-17: MINOR_SAFETY_RULE solo restringe a menores de 16,
+            # pero el modelo a veces confunde "menor de edad" (umbral legal
+            # general, 18) con el umbral específico de esta clínica --
+            # confirmado en vivo. patient_age viene de minor_patient_guard_node
+            # (única extracción de edad del grafo, ver age_signal.py).
+            age_note = age_reinforcement_note(state.get("patient_age"))
+            if age_note:
+                system_prompt = f"{system_prompt}\n\n{age_note}"
+
             messages = [
                 {"role": "system", "content": system_prompt},
                 *state.get("history", []),

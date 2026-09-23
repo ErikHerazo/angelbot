@@ -1,7 +1,9 @@
-import re
-
 from app.application.ports.minor_patient_deferral_config_repository_port import (
     MinorPatientDeferralConfigRepositoryPort,
+)
+from app.application.use_cases.conversation.age_signal import (
+    MINOR_AGE_THRESHOLD,
+    extract_youngest_age,
 )
 from app.application.use_cases.conversation.nodes import NodeFn
 from app.application.use_cases.conversation.state import ConversationState
@@ -15,17 +17,6 @@ from app.application.use_cases.conversation.state import ConversationState
 # produce una respuesta rota que ni responde ni explica (5/5 reproducible,
 # ver memoria de sesion). Esta guarda reemplaza esa instrucción rota por
 # un camino determinístico real, mismo patrón que pectus_poland_guard.
-MINOR_AGE_THRESHOLD = 16
-
-_AGE_PATTERN = re.compile(r"\b(\d{1,2})\s*años\b")
-
-
-def _mentions_minor_age(text: str) -> bool:
-    for match in _AGE_PATTERN.findall(text or ""):
-        age = int(match)
-        if 0 <= age < MINOR_AGE_THRESHOLD:
-            return True
-    return False
 
 
 def make_minor_patient_guard_node(
@@ -38,6 +29,11 @@ def make_minor_patient_guard_node(
     mensaje "pida precio explícitamente" (a diferencia de
     pectus_poland_guard, que sí distingue señales): para un caso de
     seguridad de menores, es preferible derivar de más que de menos.
+
+    Siempre deja `patient_age` en el estado (se dispare o no la guarda) --
+    es la única extracción de edad de todo el grafo (ver age_signal.py);
+    generate_with_tools_node la reutiliza para la banda 16-17 en vez de
+    que cada regla relacionada con edad vuelva a detectarla por su lado.
 
     Corre después de translate_query_node -- compara `translated_query`
     (ya en español) contra el patrón de edad, igual que pectus_poland_guard,
@@ -54,12 +50,13 @@ def make_minor_patient_guard_node(
             for m in (state.get("history") or [])
             if isinstance(m.get("content"), str)
         )
+        age = extract_youngest_age(current_text, history_text)
 
-        if _mentions_minor_age(current_text) or _mentions_minor_age(history_text):
+        if age is not None and age < MINOR_AGE_THRESHOLD:
             reply = await deferral_config.get_reply(state["tenant_id"])
-            return {"minor_patient_guard_triggered": True, "final_answer": reply}
+            return {"minor_patient_guard_triggered": True, "final_answer": reply, "patient_age": age}
 
-        return {"minor_patient_guard_triggered": False}
+        return {"minor_patient_guard_triggered": False, "patient_age": age}
 
     return minor_patient_guard_node
 

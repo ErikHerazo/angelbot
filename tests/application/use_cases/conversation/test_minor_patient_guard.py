@@ -29,7 +29,11 @@ async def test_triggers_when_current_message_mentions_an_age_under_16():
 
     result = await node(_state(translated_query="tengo 15 años y quiero un aumento de labios"))
 
-    assert result == {"minor_patient_guard_triggered": True, "final_answer": "hay que valorarlo con un especialista"}
+    assert result == {
+        "minor_patient_guard_triggered": True,
+        "final_answer": "hay que valorarlo con un especialista",
+        "patient_age": 15,
+    }
     assert config.calls == ["agb"]
 
 
@@ -54,7 +58,7 @@ async def test_does_not_trigger_for_age_16_or_above():
 
     result = await node(_state(translated_query="tengo 16 años y quiero un aumento de labios"))
 
-    assert result == {"minor_patient_guard_triggered": False}
+    assert result == {"minor_patient_guard_triggered": False, "patient_age": 16}
     assert config.calls == []
 
 
@@ -64,7 +68,7 @@ async def test_does_not_trigger_for_adult_ages():
 
     result = await node(_state(translated_query="tengo 34 años, cuanto cuesta una rinoplastia"))
 
-    assert result == {"minor_patient_guard_triggered": False}
+    assert result == {"minor_patient_guard_triggered": False, "patient_age": 34}
     assert config.calls == []
 
 
@@ -74,7 +78,7 @@ async def test_does_not_trigger_when_no_age_is_mentioned():
 
     result = await node(_state(translated_query="cuanto cuesta una rinoplastia"))
 
-    assert result == {"minor_patient_guard_triggered": False}
+    assert result == {"minor_patient_guard_triggered": False, "patient_age": None}
     assert config.calls == []
 
 
