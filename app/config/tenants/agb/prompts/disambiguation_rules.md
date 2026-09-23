@@ -153,8 +153,21 @@ mencionan explícitamente causa muscular o congénita. No requieren pregunta
 aclaratoria adicional (ver también sección "PECHO HUNDIDO" para el caso
 distinto en que solo se menciona hundimiento, sin causa muscular).
 
-IMPLANTES MUSCULARES (bíceps, tríceps, muslos):
+AUMENTO DE PECTORAL (implantes pectorales en hombres):
 - implantes pectorales
+- prótesis pectoral
+- aumento de pectorales
+- torso más definido, pectoral más marcado
+
+Este procedimiento SÍ tiene ficha propia en el catálogo estructurado y
+documento master dedicado (a diferencia de "asimetría mamaria" e
+"implantes musculares de bíceps/tríceps/muslo", ver nota más abajo) —
+se puede dar precio e información directamente, salvo que el contexto
+sea congénito (ver SÍNDROME DE POLAND arriba) o el paciente sea varón
+usando la expresión ambigua "aumento de pecho" (ver sección "AUMENTO DE
+PECHO EN HOMBRES" más arriba, que debe resolverse primero).
+
+IMPLANTES MUSCULARES (bíceps, tríceps, muslos):
 - prótesis musculares
 - implantes de bíceps, tríceps o muslos
 
