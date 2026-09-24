@@ -35,11 +35,9 @@ def make_generate_with_tools_node(
             base_prompt = await prompt_config.get_base_prompt(state["tenant_id"], state["channel"])
             system_prompt = base_prompt.format(reply_language=state["reply_language"])
 
-            # Banda 16-17: MINOR_SAFETY_RULE solo restringe a menores de 16,
-            # pero el modelo a veces confunde "menor de edad" (umbral legal
-            # general, 18) con el umbral específico de esta clínica --
-            # confirmado en vivo. patient_age viene de minor_patient_guard_node
-            # (única extracción de edad del grafo, ver age_signal.py).
+            # Nota de edad (menor de 16 ya conocido, o banda 16-17) -- ver
+            # age_reinforcement_note. patient_age viene de
+            # minor_patient_guard_node (única extracción de edad del grafo).
             age_note = age_reinforcement_note(state.get("patient_age"))
             if age_note:
                 system_prompt = f"{system_prompt}\n\n{age_note}"

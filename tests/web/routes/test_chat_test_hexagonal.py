@@ -99,7 +99,7 @@ def test_returns_422_for_unknown_engine():
     assert response.status_code == 422
 
 
-def test_langgraph_engine_is_forwarded_to_build_process_incoming_message(monkeypatch):
+def test_claude_engine_is_forwarded_to_build_process_incoming_message(monkeypatch):
     client = make_client(secret="the-real-secret")
 
     class FakeUseCase:
@@ -119,9 +119,9 @@ def test_langgraph_engine_is_forwarded_to_build_process_incoming_message(monkeyp
 
     response = client.post(
         "/test-hexagonal",
-        json={"message": "hola", "engine": "langgraph"},
+        json={"message": "hola", "engine": "claude"},
         headers={"X-Test-Secret": "the-real-secret"},
     )
 
     assert response.status_code == 200
-    assert captured["engine"] == "langgraph"
+    assert captured["engine"] == "claude"

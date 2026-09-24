@@ -48,12 +48,12 @@ async def chat_test_hexagonal(
     menos que CHAT_TEST_SECRET esté definido, y requiere el header
     X-Test-Secret con el mismo valor.
 
-    `payload.engine`: "azure_openai" (default, AzureOpenAIConversationEngineAdapter,
-    el pipeline hexagonal de siempre), "claude" (ClaudeFoundryConversationEngineAdapter,
-    motor opaco de la comparativa GPT-4o vs Claude) o "langgraph" (el agente
-    nuevo -- orchestrator + 4 ramas, completions vía Claude/Foundry, tools vía
-    MCP, ver CLAUDE.md "LangGraph agent"). `build_process_incoming_message`
-    hace la selección real -- este endpoint solo valida y reenvía `engine`.
+    `payload.engine`: solo hay dos motores -- "azure_openai" (default,
+    GPT-4o sobre el pipeline de siempre) o "claude" (el agente LangGraph --
+    orchestrator + 4 ramas + guardas, completions vía Claude/Foundry, tools
+    vía MCP; es el mismo motor que corre en prod en `clinyq`).
+    `build_process_incoming_message` hace la selección real -- este endpoint
+    solo valida y reenvía `engine`.
     """
     if not CHAT_TEST_SECRET:
         raise HTTPException(status_code=404, detail="Not found")
@@ -61,10 +61,10 @@ async def chat_test_hexagonal(
     if x_test_secret != CHAT_TEST_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if payload.engine not in ("azure_openai", "claude", "langgraph"):
+    if payload.engine not in ("azure_openai", "claude"):
         raise HTTPException(
             status_code=422,
-            detail="engine debe ser 'azure_openai', 'claude' o 'langgraph'",
+            detail="engine debe ser 'azure_openai' o 'claude'",
         )
 
     with log.operation(channel=payload.channel, engine=payload.engine):
@@ -72,13 +72,11 @@ async def chat_test_hexagonal(
         request_id = str(uuid.uuid4())
 
         chat_platform = _CapturingChatPlatform()
-        # include_flag_tools=False: este endpoint existe para comparar
-        # motores en igualdad de condiciones -- azure_openai/claude se
-        # conectan solo con is_customer_service_available/procedures_and_
-        # treatments_price_list, sin los 3 tools de señal (revisión,
-        # angustia emocional, menor de edad); no tiene efecto en "langgraph"
-        # (ese motor no toma este parámetro). Esos 3 casos dependen solo del
-        # prompt en todos los motores (decisión de Erik, 2026-09-09).
+        # include_flag_tools=False: el lado azure_openai se conecta solo con
+        # is_customer_service_available/procedures_and_treatments_price_list,
+        # sin los 3 tools de señal (revisión, angustia emocional, menor de
+        # edad) -- decisión de Erik, 2026-09-09. No tiene efecto en "claude"
+        # (el agente LangGraph no toma este parámetro).
         use_case = await build_process_incoming_message(
             TENANT_ID,
             chat_platform=chat_platform,

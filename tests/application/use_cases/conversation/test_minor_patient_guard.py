@@ -37,7 +37,31 @@ async def test_triggers_when_current_message_mentions_an_age_under_16():
     assert config.calls == ["agb"]
 
 
-async def test_triggers_when_the_age_was_mentioned_in_a_previous_turn():
+async def test_triggers_on_bare_number_answering_the_age_question():
+    config = FakeDeferralConfig("hay que valorarlo con un especialista")
+    node = make_minor_patient_guard_node(config)
+
+    history = [
+        {"role": "user", "content": "mi hija quiere hacerse los pechos"},
+        {"role": "assistant", "content": "¿Podrías indicarme la edad de tu hija?"},
+    ]
+    result = await node(_state(translated_query="14", history=history))
+
+    assert result["minor_patient_guard_triggered"] is True
+    assert result["patient_age"] == 14
+
+
+async def test_bare_number_without_age_question_is_not_an_age():
+    config = FakeDeferralConfig("hay que valorarlo con un especialista")
+    node = make_minor_patient_guard_node(config)
+
+    history = [{"role": "assistant", "content": "¿Cuántas sesiones te interesan?"}]
+    result = await node(_state(translated_query="3", history=history))
+
+    assert result == {"minor_patient_guard_triggered": False, "patient_age": None}
+
+
+async def test_triggers_when_minor_age_was_given_earlier_and_price_is_asked_now():
     config = FakeDeferralConfig("hay que valorarlo con un especialista")
     node = make_minor_patient_guard_node(config)
 
@@ -45,11 +69,45 @@ async def test_triggers_when_the_age_was_mentioned_in_a_previous_turn():
         {"role": "user", "content": "quiero un aumento de labios"},
         {"role": "assistant", "content": "¿qué edad tienes?"},
         {"role": "user", "content": "tengo 15 años"},
+        {"role": "assistant", "content": "hay que valorarlo con un especialista"},
     ]
-    result = await node(_state(translated_query="cuanto cuesta", history=history))
+    result = await node(_state(translated_query="¿y cuánto cuesta?", history=history))
 
     assert result["minor_patient_guard_triggered"] is True
     assert config.calls == ["agb"]
+
+
+async def test_does_not_stay_stuck_on_later_unrelated_messages():
+    # Conversación real de prod (2026-09-24): tras dar la edad de la hija,
+    # cada mensaje posterior recibía la plantilla de menores.
+    config = FakeDeferralConfig("hay que valorarlo con un especialista")
+    node = make_minor_patient_guard_node(config)
+
+    history = [
+        {"role": "user", "content": "mi hija quiere hacerse los pechos"},
+        {"role": "assistant", "content": "¿Podrías indicarme la edad de tu hija?"},
+        {"role": "user", "content": "14 años"},
+        {"role": "assistant", "content": "Dado que tu hija tiene 14 años, debe valorarlo un especialista."},
+    ]
+    for message in (
+        "estoy muy angustiado porque tengo el pene pequeño",
+        "no es para mi hija, es para mi",
+        "que medico realiza la liposuccion?",
+    ):
+        result = await node(_state(translated_query=message, history=history))
+        assert result == {"minor_patient_guard_triggered": False, "patient_age": 14}
+
+    assert config.calls == []
+
+
+async def test_ignores_ages_mentioned_only_by_the_assistant():
+    config = FakeDeferralConfig("hay que valorarlo con un especialista")
+    node = make_minor_patient_guard_node(config)
+
+    history = [{"role": "assistant", "content": "Dado que tu hija tiene 14 años..."}]
+    result = await node(_state(translated_query="cuanto cuesta una rinoplastia", history=history))
+
+    assert result == {"minor_patient_guard_triggered": False, "patient_age": None}
 
 
 async def test_does_not_trigger_for_age_16_or_above():

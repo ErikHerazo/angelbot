@@ -19,8 +19,10 @@ CLASSIFY_INTENT_TOOL = {
                     "enum": ["hablar_con_asesor", "agendar_cita", "info_general"],
                     "description": (
                         "'hablar_con_asesor' if the user explicitly wants to talk to a human/advisor/customer "
-                        "service. 'agendar_cita' if the user wants to book/schedule an appointment or visit. "
-                        "'info_general' for everything else (procedure info, prices, general questions)."
+                        "service. 'agendar_cita' if the user wants to book/schedule an appointment, visit or "
+                        "consultation in general. 'info_general' for everything else (procedure info, prices, "
+                        "general questions), including when the user has already chosen the free evaluation "
+                        "by sending photos/email -- that needs a contextual answer, not the booking options again."
                     ),
                 }
             },

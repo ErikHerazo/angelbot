@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Cutover switch for the real Zoho webhook path -- "legacy" (default, zero
 # behavior change) keeps using process_message_async (run_conversation_with_rag).
-# Any other value ("azure_openai" | "claude" | "langgraph") routes real
+# Any other value ("azure_openai" | "claude") routes real
 # incoming messages through the hexagonal ProcessIncomingMessage use case
 # instead, via process_message_async_hexagonal -- same engine names
 # /web/chat/test-hexagonal already accepts. Single-tenant today (AGB), same

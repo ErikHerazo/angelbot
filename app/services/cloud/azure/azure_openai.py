@@ -197,7 +197,7 @@ async def run_conversation_with_rag(
                         # precios (ya se probó que no es confiable), y
                         # responde con una pregunta aclaratoria fija.
                         # price_ambiguity_cutoff=False (comparativa GPT-4o vs
-                        # Claude, ver ClaudeFoundryConversationEngineAdapter)
+                        # Claude)
                         # desactiva este intercept -- Claude nunca lo tuvo,
                         # así que para que la comparación sea justa (mismos
                         # resultados crudos de Azure AI Search a ambos LLMs,

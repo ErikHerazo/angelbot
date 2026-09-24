@@ -5,9 +5,6 @@ from typing import Awaitable, Callable, Dict, Optional, Tuple, TypeVar
 from app.adapters.outbound.azure_openai.azure_openai_conversation_engine_adapter import (
     AzureOpenAIConversationEngineAdapter,
 )
-from app.adapters.outbound.claude_foundry.claude_foundry_conversation_engine_adapter import (
-    ClaudeFoundryConversationEngineAdapter,
-)
 from app.adapters.outbound.redis.redis_conversation_history_adapter import (
     RedisConversationHistoryAdapter,
 )
@@ -196,43 +193,6 @@ async def get_cached_lookup_procedure_price(tenant_id: str) -> LookupProcedurePr
     )
 
 
-def build_claude_conversation_engine(
-    conversation_history: "RedisConversationHistoryAdapter",
-    *,
-    check_business_availability: Optional[CheckBusinessAvailability] = None,
-    get_lookup_procedure_price: Optional[Callable[[str], Awaitable[LookupProcedurePrice]]] = None,
-) -> ClaudeFoundryConversationEngineAdapter:
-    """Builds the Claude-via-Microsoft-Foundry alternative to
-    AzureOpenAIConversationEngineAdapter -- see that adapter's docstring.
-    Reads the same infra-level env vars as the Azure OpenAI client
-    (client.py) and the main-index lookup (query_service.py) rather than
-    per-tenant config files, matching existing precedent: none of those are
-    tenant-scoped today either, in legacy or hexagonal code.
-
-    `check_business_availability`/`get_lookup_procedure_price` wire the same
-    2 tools as AzureOpenAIConversationEngineAdapter's `include_flag_tools=False`
-    mode -- see ClaudeFoundryConversationEngineAdapter's docstring for why
-    only these 2 (not the 3 flag tools) are connected on either engine for
-    this comparison."""
-    return ClaudeFoundryConversationEngineAdapter(
-        conversation_history=conversation_history,
-        prompt_config=_prompt_config,
-        foundry_api_key=os.getenv("AZURE_FOUNDRY_CLAUDE_API_KEY"),
-        foundry_endpoint=os.getenv(
-            "AZURE_FOUNDRY_CLAUDE_ENDPOINT",
-            "https://foundry-test-clinyq-resource.openai.azure.com/anthropic",
-        ),
-        deployment=os.getenv("AZURE_FOUNDRY_CLAUDE_DEPLOYMENT", "claude-sonnet-5-clinyq"),
-        search_endpoint=os.getenv("AZURE_AI_SEARCH_ENDPOINT"),
-        search_api_key=os.getenv("AZURE_AI_SEARCH_API_KEY"),
-        main_search_index=os.getenv("AZURE_AI_SEARCH_INDEX"),
-        price_search_index=os.getenv("AZURE_AI_SEARCH_PRICE_LIST_INDEX"),
-        semantic_configuration=os.getenv("SEMANTIC_CONFIGURATION"),
-        check_business_availability=check_business_availability or _check_business_availability,
-        get_lookup_procedure_price=get_lookup_procedure_price or get_cached_lookup_procedure_price,
-    )
-
-
 async def _build_llm(tenant_id: str) -> AzureOpenAILLMAdapter:
     secrets = EnvFileSecretsAdapter()
     api_key = await secrets.get_secret(f"azure-openai-api-key-{tenant_id}")
@@ -265,9 +225,8 @@ async def _build_claude_llm(tenant_id: str) -> ClaudeFoundryLLMAdapter:
 async def _build_conversation_graph_for_tenant(tenant_id: str):
     # Claude is the completions provider for this agent (Erik's call,
     # 2026-09-16) -- _build_llm/AzureOpenAILLMAdapter and the "llm" config
-    # block are kept, not removed, since other engines in this codebase
-    # (the legacy run_conversation_with_rag pipeline, and the GPT-4o side of
-    # feature/switch-to-claude's comparison) still use Azure OpenAI directly.
+    # block are kept, not removed, since the "azure_openai" engine (legacy
+    # run_conversation_with_rag pipeline) still uses Azure OpenAI directly.
     llm = await _build_claude_llm(tenant_id)
     conversation_history = _build_conversation_history()
     retrieval_tools = McpRetrievalToolsAdapter(
@@ -302,13 +261,12 @@ async def get_cached_conversation_graph(tenant_id: str):
 def build_langgraph_conversation_engine(
     *, get_graph: Optional[Callable[[str], Awaitable[object]]] = None
 ) -> LangGraphConversationEngineAdapter:
-    """The new agent: orchestrator + 4-branch StateGraph, completions via
-    Claude (Sonnet 5, Microsoft Foundry -- see _build_claude_llm), tools
-    wired via MCP to clinyq-mcp-azure-search, in place of
-    run_conversation_with_rag's Azure 'on your data' + azure_tools.py tool
-    loop. Not the default ConversationEnginePort yet -- pass this into
-    build_process_incoming_message's `conversation_engine` override to try
-    it (see app/test_langgraph_chat.py)."""
+    """The "claude" engine: orchestrator + 4-branch StateGraph (with the
+    deterministic guards), completions via Claude (Sonnet 5, Microsoft
+    Foundry -- see _build_claude_llm), tools wired via MCP to
+    clinyq-mcp-azure-search, in place of run_conversation_with_rag's Azure
+    'on your data' + azure_tools.py tool loop. This is what runs in prod
+    (`clinyq`, ZOHO_WEBHOOK_ENGINE=claude)."""
     return LangGraphConversationEngineAdapter(get_graph=get_graph or get_cached_conversation_graph)
 
 
@@ -351,10 +309,9 @@ async def build_process_incoming_message(
     message.
 
     `engine` picks which ConversationEnginePort implementation to build --
-    "azure_openai" (default, the real production path), "claude" (Claude
-    Sonnet 5 via Microsoft Foundry, opaque engine -- see
-    ClaudeFoundryConversationEngineAdapter's docstring) or "langgraph" (the
-    new orchestrator + 4-branch agent, tools via MCP -- see
+    only two exist: "azure_openai" (default, GPT-4o over the legacy
+    run_conversation_with_rag pipeline) or "claude" (the LangGraph agent,
+    Claude Sonnet 5 via Microsoft Foundry, tools via MCP -- see
     build_langgraph_conversation_engine's docstring). Ignored when
     `conversation_engine` is passed directly -- that param replaces
     AzureOpenAIConversationEngineAdapter (or whichever engine `engine` would
@@ -364,10 +321,8 @@ async def build_process_incoming_message(
 
     `include_flag_tools` (azure_openai only, default True preserves prod
     behavior) -- False disconnects the 3 flag tools (revision/reintervention,
-    emotional distress, minor patient), for the GPT-4o vs Claude comparison
-    where both engines are wired with only `is_customer_service_available`/
-    `procedures_and_treatments_price_list` (Claude never had the 3 flag
-    tools to begin with, so this only matters for azure_openai).
+    emotional distress, minor patient), used by /web/chat/test-hexagonal's
+    GPT-4o side of the comparison.
     """
     with log.operation(tenant_id=tenant_id, engine=engine):
         tenant_repository = FilesystemTenantRepository(config_dir=CONFIG_DIR)
@@ -379,13 +334,7 @@ async def build_process_incoming_message(
         conversation_history = _build_conversation_history()
 
         if conversation_engine is None:
-            if engine == "claude":
-                conversation_engine = build_claude_conversation_engine(
-                    conversation_history,
-                    check_business_availability=check_business_availability,
-                    get_lookup_procedure_price=get_lookup_procedure_price,
-                )
-            elif engine == "azure_openai":
+            if engine == "azure_openai":
                 conversation_engine = AzureOpenAIConversationEngineAdapter(
                     conversation_history=conversation_history,
                     rag_runner=rag_runner,
@@ -394,12 +343,10 @@ async def build_process_incoming_message(
                     prompt_config=prompt_config or _prompt_config,
                     include_flag_tools=include_flag_tools,
                 )
-            elif engine == "langgraph":
+            elif engine == "claude":
                 conversation_engine = build_langgraph_conversation_engine()
             else:
-                raise ValueError(
-                    f"Unknown engine: {engine!r} (expected 'azure_openai', 'claude' or 'langgraph')"
-                )
+                raise ValueError(f"Unknown engine: {engine!r} (expected 'azure_openai' or 'claude')")
 
         reply_compressor = LLMReplyCompressionAdapter(compress_fn=compress_fn)
 

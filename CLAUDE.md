@@ -243,6 +243,8 @@ Wired into the exact chain `app/test_hexagonal_chat.py` exercises: `ProcessIncom
 
 ### Claude engine for the GPT-4o vs Claude comparison (`/web/chat/test-hexagonal`, branch `feature/switch-to-claude`, 2026-09-09)
 
+> **Superseded 2026-09-24**: `ClaudeFoundryConversationEngineAdapter` was deleted — `engine="claude"` now means the LangGraph agent (see "Only two engines" below). Kept here as history.
+
 `ClaudeFoundryConversationEngineAdapter` (`app/adapters/outbound/claude_foundry/`) implements `ConversationEnginePort` using Claude Sonnet 5 via Microsoft Foundry (`AsyncAnthropicFoundry`, not the direct Anthropic API — same infra pattern as Azure OpenAI, see memory "AGB Claude migration" for why). `/web/chat/test-hexagonal` accepts an `engine` field (`"azure_openai"` default | `"claude"`) on `ChatTestRequest`, routed through `composition_root.build_process_incoming_message`'s new `engine` param to pick which adapter gets built.
 
 **Retrieval asymmetry, not resolved**: GPT-4o still gets Azure's native "on your data" server-side grounding (`extra_body.data_sources` in `make_completion.py`); Claude has no equivalent, so the main knowledge-base index is queried manually and injected as plain text into the user turn (`_default_search_main_index`, hybrid semantic+vector search, same shape as `query_service.py`).
@@ -271,6 +273,14 @@ Erik's business partner ran a large blind comparison (26 scenarios × ES/EN, sco
 - **`GenerateConversationalReply` isn't decomposed.** `ConversationEnginePort`'s real implementation (`AzureOpenAIConversationEngineAdapter`) wraps the entire `run_conversation_with_rag` as one opaque unit rather than breaking its internals (prompt building, tool loop, language enforcement, content-filter fallback) into their own pieces. Deliberate, to avoid risking the carefully-tuned behavior documented below.
 - **Legacy `SessionMemoryRedis` fallback paths.** Both production files touched above fall back to the old non-tenant-scoped Redis reads when no `history` is passed — true for every current caller. These fallback branches (and `SessionMemoryRedis` itself) become removable dead code once production is fully cut over to the new use cases.
 - Redis is planned to move to a different provider later (unrelated to this migration, mentioned by Erik in passing) — `RedisConversationHistoryAdapter`'s connection is fully injected (`redis_url` param) specifically so that's a config change, not a rewrite, when it happens.
+
+## Only two engines (Erik's call, 2026-09-24)
+
+`ConversationEnginePort` has exactly two implementations, selected by `engine` (in `/web/chat/test-hexagonal` and via `ZOHO_WEBHOOK_ENGINE` on the real Zoho path):
+- `"claude"` — the LangGraph agent below (orchestrator + guards + MCP tools, completions via Claude Sonnet 5/Foundry). **This is what runs in prod** (`clinyq`, `ZOHO_WEBHOOK_ENGINE=claude`), and what the Bot Test Console's "Claude" option sends.
+- `"azure_openai"` — GPT-4o over the legacy `run_conversation_with_rag` pipeline (`AzureOpenAIConversationEngineAdapter`).
+
+Why: until this date there were three (`azure_openai`, an opaque `claude` comparison adapter from `feature/switch-to-claude`, and `langgraph`). The console's "Claude" option hit the opaque adapter while prod ran `langgraph`, so console tests never exercised prod's code — two real prod bugs (minor guard stuck for the whole session; consultation request only offering the 55€ visit) went unseen. The opaque adapter was deleted and `"langgraph"` is no longer a valid value. Any new Claude-side behavior goes into the LangGraph agent only.
 
 ## LangGraph agent (branch `feature/langgraph-agent`, 2026-09-15/16)
 

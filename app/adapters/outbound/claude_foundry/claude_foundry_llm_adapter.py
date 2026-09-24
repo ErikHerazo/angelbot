@@ -10,10 +10,7 @@ log = get_logger(__name__)
 class ClaudeFoundryLLMAdapter:
     """Implements LLMPort using Claude (Sonnet 5) via Microsoft Foundry.
 
-    Unlike ClaudeFoundryConversationEngineAdapter (the opaque engine built for
-    the GPT-4o vs Claude comparison on feature/switch-to-claude, which does
-    its own history/language/retrieval/prompting internally), this adapter
-    is *only* the raw completion call -- this graph's nodes already own
+    This adapter is *only* the raw completion call -- this graph's nodes already own
     history, language, prompting and retrieval explicitly. It exists purely
     to translate between LLMPort's OpenAI-shaped wire format (what every
     node in agents/retrieval_agent.py and orchestrator.py already speaks,

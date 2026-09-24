@@ -23,9 +23,9 @@ class AzureSearchPriceCatalogAdapter:
     partial match. Erik's bet: Claude reasons better over noisier "any"
     results than GPT-4o did (matches the disambiguation-quality gap already
     seen in the model comparison), so the tradeoff favors reverting to the
-    Azure default here -- see ClaudeFoundryConversationEngineAdapter's
-    `max_tokens` bump in the same commit, needed because "any" can return
-    much more raw data per query for the model to reason over.
+    Azure default here (the Claude engine's `max_tokens` was bumped in the
+    same commit, needed because "any" can return much more raw data per
+    query for the model to reason over).
     """
 
     def __init__(self, *, search_endpoint: str, index_name: str, api_key: str):
